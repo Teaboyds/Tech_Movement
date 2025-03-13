@@ -1,19 +1,21 @@
 package main
 
 import (
+	database "backend-tech-movement/config"
 	"backend-tech-movement/routes"
 
-	"github.com/labstack/echo/v4"
+	"github.com/gofiber/fiber/v2"
 )
 
 func main() {
 
-	// สร้าง instance ของ Echo
-	e := echo.New()
+	db := database.ConnectDB()
 
-	// ตั้งค่า Routes
-	routes.SetupRoutes(e)
+	app := fiber.New()
 
-	// เริ่มเซิร์ฟเวอร์ที่พอร์ต 8080
-	e.Logger.Fatal(e.Start(":5000"))
+	routes.SetupNewsRoutes(app,db)
+	routes.SetupCategoryRoutes(app,db)
+
+
+	app.Listen(":7500")
 }

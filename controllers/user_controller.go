@@ -2,21 +2,31 @@
 package controllers
 
 import (
-	"net/http"
+	"log"
 
-	"github.com/labstack/echo/v4"
+	"github.com/gofiber/fiber/v2"
 )
 
-func GetUsers(c echo.Context) error {
-	return c.JSON(http.StatusOK, []string{"John", "Jane"})
+func GetUsers(c *fiber.Ctx) error {
+	user := []string{"John" , "Jane"}
+	return c.JSON(fiber.Map{
+		"status":fiber.StatusCreated ,
+		"data": user,
+	})
 }
 
-func CreateUser(c echo.Context) error {
+func CreateUser(c *fiber.Ctx) error {
 	user := new(struct {
 		Name string `json:"name"`
 	})
-	if err := c.Bind(user); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
-	}
-	return c.JSON(http.StatusCreated, user)
+	if err := c.BodyParser(&user); err != nil {
+		log.Println(err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Bad Request",
+		})			}
+
+	return c.JSON(fiber.Map{
+		"status":fiber.StatusCreated ,
+		"data": user,
+	})
 }
