@@ -14,7 +14,7 @@ func CreateCategory(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 
 		category := &news.NewsCategory{}
-		if err := c.BodyParser(&category); err != nil{
+		if err := c.BodyParser(category); err != nil{
 			log.Println(err)
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"message": "Bad Request",
@@ -27,7 +27,7 @@ func CreateCategory(db *gorm.DB) fiber.Handler {
 		category.CreatedAt = now
 		category.UpdatedAt = now
 
-		if err := db.Create(&category).Error; err != nil{
+		if err := db.Create(category).Error; err != nil{
 			log.Println(err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"message": "Internal Server Error",

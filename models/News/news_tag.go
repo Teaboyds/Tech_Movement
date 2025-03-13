@@ -9,4 +9,5 @@ type NewsTag struct {
 	Name      string `gorm:"not null; default:'Uncategorized'" json:"name"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	News            []*News `gorm:"many2many:news_newstag"`
 }
