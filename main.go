@@ -8,6 +8,8 @@ import (
 	routh "backend_tech_movement_hex/internal/app"
 	"backend_tech_movement_hex/internal/core/service"
 
+	"github.com/gofiber/fiber/v2/middleware/cors"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/swagger"
 )
@@ -24,6 +26,13 @@ import (
 func main() {
 
 	app := fiber.New()
+
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*", // Adjust this to be more restrictive if needed
+		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH",
+		AllowHeaders: "Origin, Content-Type, Accept",
+	}))
+
 	app.Get("/swagger/*", swagger.HandlerDefault)
 	mongodb.ConnectDB()
 
