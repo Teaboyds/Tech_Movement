@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func SetUpRoutes(app *fiber.App, newsHandler *handler.NewsHandler) {
+func SetUpRoutes(app *fiber.App, newsHandler *handler.NewsHandler, categoryHandler *handler.CategoryHandler) {
 
 	news := app.Group("/news")
 	{
@@ -17,6 +17,9 @@ func SetUpRoutes(app *fiber.App, newsHandler *handler.NewsHandler) {
 		news.Get("/", newsHandler.GetNewsByPage)
 		news.Put("/:id", newsHandler.UpdateNews)
 		news.Delete("/:id", newsHandler.DeleteNews)
+		news.Options("/*", func(c *fiber.Ctx) error {
+			return c.SendStatus(fiber.StatusNoContent)
+		})
 		news.Get("/uploads/:filename", func(c *fiber.Ctx) error {
 			filename := c.Params("filename")
 			directory := "./internal/core/upload"
@@ -24,6 +27,15 @@ func SetUpRoutes(app *fiber.App, newsHandler *handler.NewsHandler) {
 
 			return c.SendFile(filePath)
 		})
+	}
+
+	category := app.Group("/category")
+	{
+		category.Post("/", categoryHandler.CreateCategory)
+		category.Get("/:id", categoryHandler.GetCategoryByID)
+		category.Get("/", categoryHandler.GetAllCategory)
+		category.Put("/:id", categoryHandler.UpdateCategory)
+		category.Delete("/:id", categoryHandler.DeleteCategory)
 	}
 
 }

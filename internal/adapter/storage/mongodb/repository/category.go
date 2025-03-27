@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MongoCategoryRepository struct {
@@ -85,4 +86,67 @@ func (cat *MongoCategoryRepository) GetAll() ([]domain.Category, error) {
 	}
 
 	return categories, nil
+}
+
+func (cat *MongoCategoryRepository) UpdateCategory(id string, category *domain.Category) error {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	ObjId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"name": category.Name,
+		},
+	}
+
+	_, err = cat.db.UpdateOne(
+		ctx,
+		bson.M{"_id": ObjId},
+		update,
+		options.Update().SetUpsert(true),
+	)
+
+	return err
+}
+
+func (cat *MongoCategoryRepository) DeleteCategory(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	ObjId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	result := cat.db.FindOneAndDelete(ctx, bson.M{"_id": ObjId})
+	if result.Err() != nil {
+		return result.Err()
+	}
+
+	return nil
+
+}
+
+func (cat *MongoCategoryRepository) ExistsByName(name string) (bool, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// ค้นหา database ว่ามี name ซ้ำกันยุบ่ //
+	filter := bson.M{"name": name}
+	var result bson.M
+
+	err := cat.db.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

@@ -39,7 +39,7 @@ func NewNewsHandler(service port.NewsService, CategoryService port.CategoryRepos
 // @Failure 500 {object} domain.ErrResponse
 // @Router / [post]
 func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
-	var news domain.News
+	var news UpdateNewsRequest
 	if err := c.BodyParser(&news); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid News input"})
 	}
@@ -68,11 +68,22 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 
 	news.Image = base64.StdEncoding.EncodeToString(data)
 
-	if err := h.service.Create(&news); err != nil {
+	// ดึงไอดีของ category มาเพื่อจะได้นำมาใส่ตอน create //
+	category, _ := h.CategoryService.GetByID(news.Category)
+
+	newNews := domain.News{
+		Title:      news.Title,
+		Detail:     news.Detail,
+		Image:      news.Image,
+		CategoryID: category,
+		Tag:        news.Tag,
+	}
+
+	if err := h.service.Create(&newNews); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(news)
+	return c.Status(fiber.StatusCreated).JSON(newNews)
 }
 
 // GetNewsByPage godoc
@@ -90,17 +101,15 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 // @Router / [get]
 func (h *NewsHandler) GetNewsByPage(c *fiber.Ctx) error {
 
-	page, err := strconv.Atoi(c.Query("page", "1"))
-	if err != nil || page < 1 {
-		page = 1
-	}
-
+	lastID := c.Query("lastID")
 	limit, err := strconv.Atoi(c.Query("limit", "10"))
 	if err != nil || limit < 1 {
 		limit = 10
 	}
 
-	news, total, err := h.service.GetNewsPagination(page, limit)
+	fmt.Println(lastID)
+
+	news, err := h.service.GetNewsPagination(lastID, limit)
 	if err != nil {
 		fmt.Println(err)
 		return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
@@ -108,12 +117,17 @@ func (h *NewsHandler) GetNewsByPage(c *fiber.Ctx) error {
 		})
 	}
 
+	for i := range news {
+		if err := utils.ProcessImageToURL(&news[i]); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
+				Error: "Failed to process image.",
+			})
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"data":  news,
-		"page":  page,
 		"limit": limit,
-		"total": total,
-		"pages": (total + int(limit) - 1) / int(limit),
 	})
 }
 
@@ -148,7 +162,7 @@ type UpdateNewsRequest struct {
 	Title     string   `json:"title"`
 	Detail    string   `json:"detail"`
 	Image     string   `json:"image"`
-	Category  string   `json:"category_id"`
+	Category  string   `json:"category"`
 	Tag       []string `json:"tag"`
 	UpdatedAt string   `json:"updated_at"`
 }
@@ -160,6 +174,8 @@ func (h *NewsHandler) UpdateNews(c *fiber.Ctx) error {
 	if err := c.BodyParser(&news); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Update News input"})
 	}
+
+	fmt.Println(news.Category)
 
 	_, err := primitive.ObjectIDFromHex(id)
 	if err != nil {

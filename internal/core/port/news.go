@@ -6,7 +6,7 @@ import (
 
 type NewsRepository interface {
 	Create(news *d.News) error
-	GetNewsPagination(page int, limit int) ([]d.News, int, error)
+	GetNewsPagination(lastID string, limit int) ([]d.News, error)
 	GetNewsByID(id string) (*d.News, error)
 	UpdateNews(id string, news *d.News) error
 	Delete(id string) error
@@ -14,7 +14,7 @@ type NewsRepository interface {
 
 type NewsService interface {
 	Create(news *d.News) error
-	GetNewsPagination(page int, limit int) ([]d.News, int, error)
+	GetNewsPagination(lastID string, limit int) ([]d.News, error)
 	GetNewsByID(id string) (*d.News, error)
 	UpdateNews(id string, news *d.News) error
 	Delete(id string) error

@@ -32,39 +32,41 @@ func (n *MongoNewsRepository) Create(news *d.News) error {
 	return err
 }
 
-func (n *MongoNewsRepository) GetNewsPagination(page int, limit int) ([]d.News, int, error) {
+func (n *MongoNewsRepository) GetNewsPagination(lastID string, limit int) ([]d.News, error) {
 
 	var news []d.News
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// คำนวณการข้ามข้อมูลระหว่างหน้า ข้ามหน้า //
-	skip := (page - 1) * limit
+	// cursor based pagination //
+	filter := bson.M{}
+	if lastID != "" {
+		ObjID, err := primitive.ObjectIDFromHex(lastID)
+		if err != nil {
+			return nil, err
+		}
+		filter["_id"] = bson.M{"$lt": ObjID}
+	}
 
 	findOption := options.Find()
-	findOption.SetSkip(int64(skip))
+	findOption.SetSort(bson.M{"_id": -1})
 	findOption.SetLimit(int64(limit))
 
-	cursor, err := n.db.Find(ctx, bson.M{}, findOption)
+	cursor, err := n.db.Find(ctx, filter, findOption)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	for cursor.Next(ctx) {
 		var new d.News
 		if err := cursor.Decode(&new); err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		news = append(news, new)
 	}
 
-	total, err := n.db.CountDocuments(ctx, bson.M{})
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return news, int(total), nil
+	return news, nil
 }
 
 func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {

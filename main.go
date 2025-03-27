@@ -28,7 +28,7 @@ func main() {
 	app := fiber.New()
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*", // Adjust this to be more restrictive if needed
+		AllowOrigins: "http://localhost:3000 , http://127.0.0.1:3000",
 		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH",
 		AllowHeaders: "Origin, Content-Type, Accept",
 	}))
@@ -38,9 +38,13 @@ func main() {
 
 	// news //
 	categoryRepo := repository.NewCategoryRepositoryMongo(mongodb.GetDatabase())
+	categoryService := service.NewCategoryService(categoryRepo)
+	categoryHandler := handler.NewCategoryHandler(categoryService)
+
 	newsRepo := repository.NewNewsRepo(mongodb.GetDatabase())
 	newService := service.NewsService(newsRepo, categoryRepo)
 	newHandler := handler.NewNewsHandler(newService, categoryRepo)
-	routh.SetUpRoutes(app, newHandler)
+
+	routh.SetUpRoutes(app, newHandler, categoryHandler)
 	app.Listen(":5050")
 }

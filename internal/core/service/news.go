@@ -47,8 +47,8 @@ func (n *NewsServiceImpl) Create(news *d.News) error {
 	return n.repo.Create(news)
 }
 
-func (n *NewsServiceImpl) GetNewsPagination(page int, limit int) ([]d.News, int, error) {
-	return n.repo.GetNewsPagination(page, limit)
+func (n *NewsServiceImpl) GetNewsPagination(lastID string, limit int) ([]d.News, error) {
+	return n.repo.GetNewsPagination(lastID, limit)
 }
 
 func (n *NewsServiceImpl) GetNewsByID(id string) (*d.News, error) {

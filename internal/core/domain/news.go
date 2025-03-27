@@ -8,7 +8,7 @@ type News struct {
 	Title      string             `bson:"title" json:"title"`
 	Detail     string             `bson:"detail" json:"detail"`
 	Image      string             `bson:"image" json:"image"`
-	CategoryID *Category          `bson:"category_id" json:"category_id"`
+	CategoryID *Category          `bson:"category_id" json:"category"`
 	Tag        []string           `bson:"tag" json:"tag"`
 	CreatedAt  string             `bson:"created_at" json:"created_at"`
 	UpdatedAt  string             `bson:"updated_at" json:"updated_at"`
