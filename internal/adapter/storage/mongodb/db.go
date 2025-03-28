@@ -43,7 +43,7 @@ func ConnectDB() {
 	if err != nil {
 		log.Fatal("Can't connect mongodb: ", err)
 	} else {
-		fmt.Println("connected complete eiei")
+		log.Println("Connected to Mongodb")
 	}
 
 	MongoClient = client

@@ -143,7 +143,7 @@ func (h *NewsHandler) GetNewsByID(c *fiber.Ctx) error {
 		}
 		log.Println(err)
 		return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
-			Error: "Cannot Fetch Data.",
+			Error: "Cannot Fetch Dataa.",
 		})
 	}
 

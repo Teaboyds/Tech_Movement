@@ -1,17 +1,18 @@
 package service
 
 import (
+	"backend_tech_movement_hex/internal/adapter/storage/mongodb/repository"
 	d "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
 )
 
 type NewsServiceImpl struct {
-	repo         port.NewsRepository
+	repo         *repository.MongoNewsRepository
 	categoryRepo port.CategoryRepository
 }
 
-func NewsService(repo port.NewsRepository, categoryRepo port.CategoryRepository) port.NewsService {
+func NewsService(repo *repository.MongoNewsRepository, categoryRepo port.CategoryRepository) port.NewsService {
 	return &NewsServiceImpl{
 		repo:         repo,
 		categoryRepo: categoryRepo,

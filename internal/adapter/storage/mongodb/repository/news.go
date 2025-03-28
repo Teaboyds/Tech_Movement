@@ -3,10 +3,13 @@ package repository
 
 import (
 	d "backend_tech_movement_hex/internal/core/domain"
-	"backend_tech_movement_hex/internal/core/port"
 	"context"
+	"encoding/json"
+	"errors"
+	"log"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -14,11 +17,15 @@ import (
 )
 
 type MongoNewsRepository struct {
-	db *mongo.Collection
+	db    *mongo.Collection
+	redis *redis.Client
 }
 
-func NewNewsRepo(db *mongo.Database) port.NewsRepository {
-	return &MongoNewsRepository{db: db.Collection("news")}
+func NewNewsRepo(db *mongo.Database, redisClient *redis.Client) *MongoNewsRepository {
+	return &MongoNewsRepository{
+		db:    db.Collection("news"),
+		redis: redisClient,
+	}
 }
 
 func (n *MongoNewsRepository) Create(news *d.News) error {
@@ -80,13 +87,44 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 		return nil, err
 	}
 
-	// find id in database //
-	err = n.db.FindOne(ctx, bson.M{"_id": ObjID}).Decode(&news)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
+	if n.db == nil {
+		return nil, errors.New("MongoDB client is nil")
+	}
+	if n.redis == nil {
+		return nil, errors.New("Redis client is nil")
+	}
+
+	cacheKey := "News_Keys_" + id
+	val, err := n.redis.Get(ctx, cacheKey).Result()
+
+	// if บ่เจอ cache เด้อครับ //
+	if err == redis.Nil {
+		// find id in database //
+		err = n.db.FindOne(ctx, bson.M{"_id": ObjID}).Decode(&news)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return nil, err
+			}
 			return nil, err
 		}
+
+		data, err := json.Marshal(news)
+		if err != nil {
+			return nil, err
+		}
+
+		err = n.redis.Set(ctx, cacheKey, data, 10*time.Minute).Err()
+		if err != nil {
+			return nil, err
+		}
+	} else if err != nil {
 		return nil, err
+	} else {
+		err = json.Unmarshal([]byte(val), &news)
+		if err != nil {
+			log.Println("Error unmarshaling data from Redis:", err)
+			return nil, err
+		}
 	}
 
 	return &news, nil

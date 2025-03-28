@@ -5,8 +5,10 @@ import (
 	"backend_tech_movement_hex/internal/adapter/handler"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb/repository"
+	"backend_tech_movement_hex/internal/adapter/storage/redis"
 	routh "backend_tech_movement_hex/internal/app"
 	"backend_tech_movement_hex/internal/core/service"
+	"log"
 
 	"github.com/gofiber/fiber/v2/middleware/cors"
 
@@ -34,6 +36,12 @@ func main() {
 	}))
 
 	app.Get("/swagger/*", swagger.HandlerDefault)
+	redis.ConnectedRedis()
+	if redis.RedisClient == nil {
+		log.Fatal("❌ RedisClient is still nil after ConnectedRedis()")
+	} else {
+		log.Println("✅ RedisClient initialized:", redis.RedisClient)
+	}
 	mongodb.ConnectDB()
 
 	// news //
@@ -41,7 +49,7 @@ func main() {
 	categoryService := service.NewCategoryService(categoryRepo)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 
-	newsRepo := repository.NewNewsRepo(mongodb.GetDatabase())
+	newsRepo := repository.NewNewsRepo(mongodb.GetDatabase(), redis.RedisClient)
 	newService := service.NewsService(newsRepo, categoryRepo)
 	newHandler := handler.NewNewsHandler(newService, categoryRepo)
 
