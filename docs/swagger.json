@@ -10,16 +10,16 @@
         "version": "1.0"
     },
     "host": "localhost:5050",
-    "basePath": "/api/news",
+    "basePath": "/api",
     "paths": {
-        "/": {
+        "/news": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Get paginated news by specifying page and limit",
+                "description": "ดึงข้อมูลข่าวแบบ pagination โดยดึงจาก lastid กล่าวคือหากใส่ id ของข่าวแล้วหลังจาก id ลงไปนั้นตาม limit",
                 "consumes": [
                     "application/json"
                 ],
@@ -32,9 +32,9 @@
                 "summary": "Get News Pagination",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Page number (default: 1)",
-                        "name": "page",
+                        "type": "string",
+                        "description": "ID of the last news item from the previous page",
+                        "name": "lastID",
                         "in": "query"
                     },
                     {
@@ -71,7 +71,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Create a new news article",
+                "description": "api สร้างหน้าข่าวใหม่",
                 "consumes": [
                     "application/json"
                 ],
@@ -81,7 +81,7 @@
                 "tags": [
                     "news"
                 ],
-                "summary": "Create a news article",
+                "summary": "Create a New News",
                 "parameters": [
                     {
                         "description": "News Data",
@@ -139,7 +139,7 @@
         "domain.News": {
             "type": "object",
             "properties": {
-                "category_id": {
+                "category": {
                     "$ref": "#/definitions/domain.Category"
                 },
                 "created_at": {

@@ -45,3 +45,7 @@ func ConnectedRedis() {
 	}
 	log.Println("Connected to Redis")
 }
+
+func GetRedisClient() *redis.Client {
+	return RedisClient
+}

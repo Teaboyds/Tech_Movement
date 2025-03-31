@@ -1,4 +1,4 @@
-basePath: /api/news
+basePath: /api
 definitions:
   domain.Category:
     properties:
@@ -14,7 +14,7 @@ definitions:
     type: object
   domain.News:
     properties:
-      category_id:
+      category:
         $ref: '#/definitions/domain.Category'
       created_at:
         type: string
@@ -40,16 +40,17 @@ info:
   title: News API
   version: "1.0"
 paths:
-  /:
+  /news:
     get:
       consumes:
       - application/json
-      description: Get paginated news by specifying page and limit
+      description: ดึงข้อมูลข่าวแบบ pagination โดยดึงจาก lastid กล่าวคือหากใส่ id
+        ของข่าวแล้วหลังจาก id ลงไปนั้นตาม limit
       parameters:
-      - description: 'Page number (default: 1)'
+      - description: ID of the last news item from the previous page
         in: query
-        name: page
-        type: integer
+        name: lastID
+        type: string
       - description: 'Number of news per page (default: 10)'
         in: query
         name: limit
@@ -77,7 +78,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new news article
+      description: api สร้างหน้าข่าวใหม่
       parameters:
       - description: News Data
         in: body
@@ -102,7 +103,7 @@ paths:
             $ref: '#/definitions/domain.ErrResponse'
       security:
       - ApiKeyAuth: []
-      summary: Create a news article
+      summary: Create a New News
       tags:
       - news
 schemes:

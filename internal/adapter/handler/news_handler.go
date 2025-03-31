@@ -5,6 +5,7 @@ import (
 	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -20,15 +21,20 @@ import (
 type NewsHandler struct {
 	service         port.NewsService
 	CategoryService port.CategoryRepository
+	cacheService    port.CacheRepository
 }
 
-func NewNewsHandler(service port.NewsService, CategoryService port.CategoryRepository) *NewsHandler {
-	return &NewsHandler{service: service, CategoryService: CategoryService}
+func NewNewsHandler(service port.NewsService, CategoryService port.CategoryRepository, cacheService port.CacheRepository) *NewsHandler {
+	return &NewsHandler{
+		service:         service,
+		CategoryService: CategoryService,
+		cacheService:    cacheService,
+	}
 }
 
 // CreateNews godoc
-// @Summary Create a news article
-// @Description Create a new news article
+// @Summary Create a New News
+// @Description api สร้างหน้าข่าวใหม่
 // @Tags news
 // @Accept json
 // @Produce json
@@ -37,7 +43,7 @@ func NewNewsHandler(service port.NewsService, CategoryService port.CategoryRepos
 // @Success 201 {object} domain.News
 // @Failure 404 {object} domain.ErrResponse
 // @Failure 500 {object} domain.ErrResponse
-// @Router / [post]
+// @Router /news [post]
 func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 	var news UpdateNewsRequest
 	if err := c.BodyParser(&news); err != nil {
@@ -83,22 +89,26 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	if err := h.cacheService.DeletePattern(context.Background(), "News_Keys_*"); err != nil {
+		log.Printf("Error deleting cache key: %v", err)
+	}
+
 	return c.Status(fiber.StatusCreated).JSON(newNews)
 }
 
 // GetNewsByPage godoc
 // @Summary Get News Pagination
-// @Description Get paginated news by specifying page and limit
+// @Description ดึงข้อมูลข่าวแบบ pagination โดยดึงจาก lastid กล่าวคือหากใส่ id ของข่าวแล้วหลังจาก id ลงไปนั้นตาม limit
 // @Tags news
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
-// @Param page query int false "Page number (default: 1)"
+// @Param lastID query string false "ID of the last news item from the previous page"
 // @Param limit query int false "Number of news per page (default: 10)"
 // @Success 200 {object} domain.News
 // @Failure 400 {object} domain.ErrResponse "Invalid request parameters"
 // @Failure 500 {object} domain.ErrResponse "Cannot Fetch Data."
-// @Router / [get]
+// @Router /news [get]
 func (h *NewsHandler) GetNewsByPage(c *fiber.Ctx) error {
 
 	lastID := c.Query("lastID")
@@ -126,8 +136,9 @@ func (h *NewsHandler) GetNewsByPage(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"data":  news,
-		"limit": limit,
+		"data":   news,
+		"limit":  limit,
+		"lastID": news[len(news)-1].ID,
 	})
 }
 

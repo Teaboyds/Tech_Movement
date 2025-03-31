@@ -15,14 +15,14 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/": {
+        "/news": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Get paginated news by specifying page and limit",
+                "description": "ดึงข้อมูลข่าวแบบ pagination โดยดึงจาก lastid กล่าวคือหากใส่ id ของข่าวแล้วหลังจาก id ลงไปนั้นตาม limit",
                 "consumes": [
                     "application/json"
                 ],
@@ -35,9 +35,9 @@ const docTemplate = `{
                 "summary": "Get News Pagination",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Page number (default: 1)",
-                        "name": "page",
+                        "type": "string",
+                        "description": "ID of the last news item from the previous page",
+                        "name": "lastID",
                         "in": "query"
                     },
                     {
@@ -74,7 +74,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Create a new news article",
+                "description": "api สร้างหน้าข่าวใหม่",
                 "consumes": [
                     "application/json"
                 ],
@@ -84,7 +84,7 @@ const docTemplate = `{
                 "tags": [
                     "news"
                 ],
-                "summary": "Create a news article",
+                "summary": "Create a New News",
                 "parameters": [
                     {
                         "description": "News Data",
@@ -142,7 +142,7 @@ const docTemplate = `{
         "domain.News": {
             "type": "object",
             "properties": {
-                "category_id": {
+                "category": {
                     "$ref": "#/definitions/domain.Category"
                 },
                 "created_at": {
@@ -185,7 +185,7 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:5050",
-	BasePath:         "/api/news",
+	BasePath:         "/api",
 	Schemes:          []string{"http"},
 	Title:            "News API",
 	Description:      "This is a sample server for a News API.",

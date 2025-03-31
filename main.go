@@ -20,7 +20,7 @@ import (
 // @description This is a sample server for a News API.
 // @version 1.0
 // @host localhost:5050
-// @BasePath /api/news
+// @BasePath /api
 // @schemes http
 // @securityDefinitions.apikey ApiKeyAuth
 // @in header
@@ -42,7 +42,11 @@ func main() {
 	} else {
 		log.Println("✅ RedisClient initialized:", redis.RedisClient)
 	}
+
 	mongodb.ConnectDB()
+
+	//Redis//
+	cacheRepo := redis.NewRedisCacheRepository(redis.RedisClient)
 
 	// news //
 	categoryRepo := repository.NewCategoryRepositoryMongo(mongodb.GetDatabase())
@@ -51,7 +55,7 @@ func main() {
 
 	newsRepo := repository.NewNewsRepo(mongodb.GetDatabase(), redis.RedisClient)
 	newService := service.NewsService(newsRepo, categoryRepo)
-	newHandler := handler.NewNewsHandler(newService, categoryRepo)
+	newHandler := handler.NewNewsHandler(newService, categoryRepo, cacheRepo)
 
 	routh.SetUpRoutes(app, newHandler, categoryHandler)
 	app.Listen(":5050")

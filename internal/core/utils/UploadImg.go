@@ -8,12 +8,6 @@ import (
 	"path/filepath"
 )
 
-type ObjectFileData struct {
-	FileName string `json:"file_name"`
-	Size     int    `json:"size"`
-	Content  string `json:"content"`
-}
-
 func ProcessImageToURL(news *domain.News) error {
 	// Decode Base64 string
 	data, err := base64.StdEncoding.DecodeString(news.Image)

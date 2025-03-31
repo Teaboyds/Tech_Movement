@@ -12,6 +12,12 @@ type Redis struct {
 	client *redis.Client
 }
 
+func NewRedisCacheRepository(client *redis.Client) *Redis {
+	return &Redis{
+		client: client,
+	}
+}
+
 func (r *Redis) Set(ctx context.Context, key string, value interface{}, timeout time.Duration) error {
 
 	// แปลง value เพื่อเก็บใน redis เพราะ ฝ //
