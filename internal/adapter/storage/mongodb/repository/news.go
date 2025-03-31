@@ -108,11 +108,13 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 			return nil, err
 		}
 
+		// แปลงร่าง struct เป็น json //
 		data, err := json.Marshal(news)
 		if err != nil {
 			return nil, err
 		}
 
+		// ละกะเซ็ทแคชไว้บาดนิ สิบนาที //
 		err = n.redis.Set(ctx, cacheKey, data, 10*time.Minute).Err()
 		if err != nil {
 			return nil, err
@@ -120,6 +122,7 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 	} else if err != nil {
 		return nil, err
 	} else {
+		// ถ้าพ้อ cache กะแปลง jsonมาเป็น struct
 		err = json.Unmarshal([]byte(val), &news)
 		if err != nil {
 			log.Println("Error unmarshaling data from Redis:", err)
