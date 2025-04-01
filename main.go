@@ -37,6 +37,8 @@ func main() {
 
 	app.Get("/swagger/*", swagger.HandlerDefault)
 	redis.ConnectedRedis()
+
+	// debug : if redis disconnected //
 	if redis.RedisClient == nil {
 		log.Fatal("❌ RedisClient is still nil after ConnectedRedis()")
 	} else {

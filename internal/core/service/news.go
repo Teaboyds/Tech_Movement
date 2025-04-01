@@ -63,3 +63,11 @@ func (n *NewsServiceImpl) UpdateNews(id string, news *d.News) error {
 func (n *NewsServiceImpl) Delete(id string) error {
 	return n.repo.Delete(id)
 }
+
+func (n *NewsServiceImpl) GetNewsByCategory(CategoryId string) ([]d.News, error) {
+	return n.repo.GetNewsByCategory(CategoryId)
+}
+
+func (n *NewsServiceImpl) GetNewsByTags(name string) ([]d.News, error) {
+	return n.repo.GetNewsByCategory(name)
+}

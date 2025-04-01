@@ -55,6 +55,7 @@ func (n *MongoNewsRepository) GetNewsPagination(lastID string, limit int) ([]d.N
 		filter["_id"] = bson.M{"$lt": ObjID}
 	}
 
+	// set spect for sort //
 	findOption := options.Find()
 	findOption.SetSort(bson.M{"_id": -1})
 	findOption.SetLimit(int64(limit))
@@ -63,8 +64,8 @@ func (n *MongoNewsRepository) GetNewsPagination(lastID string, limit int) ([]d.N
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
 
+	// loop decode and appened//
 	for cursor.Next(ctx) {
 		var new d.News
 		if err := cursor.Decode(&new); err != nil {
@@ -72,6 +73,7 @@ func (n *MongoNewsRepository) GetNewsPagination(lastID string, limit int) ([]d.N
 		}
 		news = append(news, new)
 	}
+	defer cursor.Close(ctx)
 
 	return news, nil
 }
@@ -87,11 +89,12 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 		return nil, err
 	}
 
+	// debug if not found database or cache server der kub //
 	if n.db == nil {
-		return nil, errors.New("MongoDB client is nil")
+		return nil, errors.New("mongoDB client is nil")
 	}
 	if n.redis == nil {
-		return nil, errors.New("Redis client is nil")
+		return nil, errors.New("redis client is nil")
 	}
 
 	cacheKey := "News_Keys_" + id
@@ -178,4 +181,51 @@ func (n *MongoNewsRepository) Delete(id string) error {
 	}
 
 	return nil
+}
+
+func (n *MongoNewsRepository) GetNewsByCategory(CategoryId string) ([]d.News, error) {
+
+	var newsList []d.News
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	ObjID, err := primitive.ObjectIDFromHex(CategoryId)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := bson.M{
+		"category_id._id": ObjID,
+	}
+	cursor, err := n.db.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err = cursor.All(ctx, &newsList); err != nil {
+		return nil, err
+	}
+
+	return newsList, nil
+}
+
+func (n *MongoCategoryRepository) GetNewsByTags(name string) ([]d.News, error) {
+
+	var news []d.News
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	filter := bson.M{"tags": name}
+	cursor, err := n.db.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &news); err != nil {
+		return nil, err
+	}
+
+	return news, nil
 }

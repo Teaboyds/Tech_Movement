@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+
 	"strconv"
 	"time"
 
@@ -169,6 +170,42 @@ func (h *NewsHandler) GetNewsByID(c *fiber.Ctx) error {
 	})
 }
 
+func (h *NewsHandler) GetNewsByCategory(c *fiber.Ctx) error {
+
+	CategoryID := c.Params("id")
+
+	fmt.Println(CategoryID)
+
+	newsList, err := h.service.GetNewsByCategory(CategoryID)
+	if err != nil {
+		fmt.Println(err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal Server Error",
+		})
+	}
+
+	if len(newsList) == 0 {
+		fmt.Println("No news found for CategoryID:", CategoryID)
+	}
+
+	// instance ดึงตัว name category เพื่อนำไปแสดงใน response //
+	categoryName := newsList[0].CategoryID.Name
+
+	for i := range newsList {
+		if err := utils.ProcessImageToURL(&newsList[i]); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
+				Error: "Failed to process image.",
+			})
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"category": categoryName,
+		"news":     newsList,
+	})
+}
+
+// build struct มารับ request อย่างเดียว //
 type UpdateNewsRequest struct {
 	Title     string   `json:"title"`
 	Detail    string   `json:"detail"`

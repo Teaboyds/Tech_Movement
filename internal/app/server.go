@@ -14,6 +14,7 @@ func SetUpRoutes(app *fiber.App, newsHandler *handler.NewsHandler, categoryHandl
 	{
 		news.Post("/", newsHandler.CreateNews)
 		news.Get("/:id", newsHandler.GetNewsByID)
+		news.Get("/category/:id", newsHandler.GetNewsByCategory)
 		news.Get("/", newsHandler.GetNewsByPage)
 		news.Put("/:id", newsHandler.UpdateNews)
 		news.Delete("/:id", newsHandler.DeleteNews)
