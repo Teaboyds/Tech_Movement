@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/swagger"
 )
 
 type Router struct {
@@ -23,6 +24,8 @@ type RouterParams struct {
 func SetUpRoutes(p RouterParams) (*Router, error) {
 
 	app := fiber.New()
+
+	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     p.Config.HttpOrigins,

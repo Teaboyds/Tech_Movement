@@ -4,6 +4,7 @@ import (
 	_ "backend_tech_movement_hex/docs"
 	"backend_tech_movement_hex/internal/adapter/config"
 	"backend_tech_movement_hex/internal/adapter/handler"
+	"backend_tech_movement_hex/internal/adapter/logger"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb/repository"
 	cache "backend_tech_movement_hex/internal/adapter/storage/redis"
@@ -13,15 +14,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/swagger"
 	"github.com/redis/go-redis/v9"
 )
 
 func Init(config *config.Container) {
-	app := fiber.New()
-
-	app.Get("/swagger/*", swagger.HandlerDefault)
+	logger.ZapInit()
 
 	ctx := context.Background()
 
@@ -66,14 +63,18 @@ func Init(config *config.Container) {
 		CategoryHandler: *categoryHandler,
 	})
 	if err != nil {
-
+		logger.Error("Error initializing router" + "error" + err.Error())
+		os.Exit(1)
 	}
 
 	//read address from config//
+	logger.Info(config.HTTP.URL + ":" + config.HTTP.Port)
 	listenAddr := fmt.Sprintf("%s:%s", config.HTTP.URL, config.HTTP.Port)
+	logger.Info("Starting the HTTP server " + "< listen_address : " + listenAddr + " >")
 	err = router.Serve(listenAddr)
 	if err != nil {
-
+		logger.Error("Error starting the HTTP server" + "error" + err.Error())
+		os.Exit(1)
 	}
 
 }
