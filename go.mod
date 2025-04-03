@@ -15,6 +15,7 @@ require (
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/spec v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.1 // indirect
+	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/gofiber/fiber/v2 v2.52.6 // indirect
 	github.com/gofiber/swagger v1.1.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect

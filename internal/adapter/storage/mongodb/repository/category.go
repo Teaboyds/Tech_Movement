@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"context"
@@ -17,7 +18,7 @@ type MongoCategoryRepository struct {
 	db *mongo.Collection
 }
 
-func NewCategoryRepositoryMongo(db *mongo.Database) port.CategoryRepository {
+func NewCategoryRepositoryMongo(db *mongodb.Database) port.CategoryRepository {
 	return &MongoCategoryRepository{db: db.Collection("categories")}
 }
 

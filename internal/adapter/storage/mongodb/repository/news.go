@@ -2,6 +2,7 @@
 package repository
 
 import (
+	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	d "backend_tech_movement_hex/internal/core/domain"
 	"context"
 	"encoding/json"
@@ -17,14 +18,14 @@ import (
 )
 
 type MongoNewsRepository struct {
-	db    *mongo.Collection
-	redis *redis.Client
+	collection *mongo.Collection
+	redis      *redis.Client
 }
 
-func NewNewsRepo(db *mongo.Database, redisClient *redis.Client) *MongoNewsRepository {
+func NewNewsRepo(db *mongodb.Database, redisClient *redis.Client) *MongoNewsRepository {
 	return &MongoNewsRepository{
-		db:    db.Collection("news"),
-		redis: redisClient,
+		collection: db.Collection("news"),
+		redis:      redisClient,
 	}
 }
 
@@ -34,7 +35,7 @@ func (n *MongoNewsRepository) Create(news *d.News) error {
 	defer cancel()
 
 	news.ID = primitive.NewObjectID()
-	_, err := n.db.InsertOne(ctx, news)
+	_, err := n.collection.InsertOne(ctx, news)
 
 	return err
 }
@@ -60,7 +61,7 @@ func (n *MongoNewsRepository) GetNewsPagination(lastID string, limit int) ([]d.N
 	findOption.SetSort(bson.M{"_id": -1})
 	findOption.SetLimit(int64(limit))
 
-	cursor, err := n.db.Find(ctx, filter, findOption)
+	cursor, err := n.collection.Find(ctx, filter, findOption)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +91,7 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 	}
 
 	// debug if not found database or cache server der kub //
-	if n.db == nil {
+	if n.collection == nil {
 		return nil, errors.New("mongoDB client is nil")
 	}
 	if n.redis == nil {
@@ -103,7 +104,7 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 	// if บ่เจอ cache เด้อครับ //
 	if err == redis.Nil {
 		// find id in database //
-		err = n.db.FindOne(ctx, bson.M{"_id": ObjID}).Decode(&news)
+		err = n.collection.FindOne(ctx, bson.M{"_id": ObjID}).Decode(&news)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				return nil, err
@@ -156,7 +157,7 @@ func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
 		},
 	}
 
-	_, err = n.db.UpdateOne(
+	_, err = n.collection.UpdateOne(
 		ctx,
 		bson.M{"_id": objID},
 		update,
@@ -175,7 +176,7 @@ func (n *MongoNewsRepository) Delete(id string) error {
 		return err
 	}
 
-	result := n.db.FindOneAndDelete(ctx, bson.M{"_id": objID})
+	result := n.collection.FindOneAndDelete(ctx, bson.M{"_id": objID})
 	if result.Err() != nil {
 		return result.Err()
 	}
@@ -197,7 +198,7 @@ func (n *MongoNewsRepository) GetNewsByCategory(CategoryId string) ([]d.News, er
 	filter := bson.M{
 		"category_id._id": ObjID,
 	}
-	cursor, err := n.db.Find(ctx, filter)
+	cursor, err := n.collection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

@@ -33,7 +33,7 @@ func ProcessImageToURL(news *domain.News) error {
 	// สร้าง URL สำหรับไฟล์
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
-		baseURL = "http://localhost:5050/news/uploads"
+		baseURL = "http://localhost:5050/api/v1/news/uploads"
 	}
 	news.Image = fmt.Sprintf("%s/%s", baseURL, fileName)
 

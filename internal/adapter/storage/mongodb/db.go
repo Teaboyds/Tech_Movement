@@ -1,37 +1,22 @@
 package mongodb
 
 import (
+	"backend_tech_movement_hex/internal/adapter/config"
 	"context"
-	"fmt"
 	"log"
-	"os"
-	"time"
 
-	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var MongoClient *mongo.Client
-
-func LoadEnv() {
-	err := godotenv.Load("./.env")
-	if err != nil {
-		fmt.Println("Env coudln't Load", err)
-	}
+type Database struct {
+	MongoClient *mongo.Client
+	DBName      string
 }
 
-func ConnectDB() {
+func ConnectDB(ctx context.Context, config *config.DB) (*Database, error) {
 
-	LoadEnv()
-
-	mongoURL := os.Getenv("MONGO_URI")
-	if mongoURL == "" {
-		mongoURL = "mongodb://localhost:27017"
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	mongoURL := config.URL
 
 	clientOption := options.Client().ApplyURI(mongoURL)
 	client, err := mongo.Connect(ctx, clientOption)
@@ -46,9 +31,18 @@ func ConnectDB() {
 		log.Println("Connected to Mongodb")
 	}
 
-	MongoClient = client
+	return &Database{MongoClient: client, DBName: config.DB_NAME}, nil
 }
 
-func GetDatabase() *mongo.Database {
-	return MongoClient.Database("hexagonal_db")
+func (db *Database) Close(ctx context.Context) error {
+	if err := db.MongoClient.Disconnect(ctx); err != nil {
+		log.Println("Database close error -:", err)
+		return err
+	}
+	log.Println("Database close!")
+	return nil
+}
+
+func (db *Database) Collection(name string) *mongo.Collection {
+	return db.MongoClient.Database(db.DBName).Collection(name)
 }

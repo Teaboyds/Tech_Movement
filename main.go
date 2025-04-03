@@ -2,21 +2,82 @@ package main
 
 import (
 	_ "backend_tech_movement_hex/docs"
+	"backend_tech_movement_hex/internal/adapter/config"
 	"backend_tech_movement_hex/internal/adapter/handler"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb/repository"
-	"backend_tech_movement_hex/internal/adapter/storage/redis"
-	routh "backend_tech_movement_hex/internal/app"
+	cache "backend_tech_movement_hex/internal/adapter/storage/redis"
 	"backend_tech_movement_hex/internal/core/service"
-	"log"
-
-	"github.com/gofiber/fiber/v2/middleware/cors"
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/swagger"
+	"github.com/redis/go-redis/v9"
 )
 
-// @title News API
+func Init(config *config.Container) {
+	app := fiber.New()
+
+	app.Get("/swagger/*", swagger.HandlerDefault)
+
+	ctx := context.Background()
+
+	fmt.Println("MongoDB URI:", config.DB.URL)
+	fmt.Println("MongoDB Name:", config.DB.DB_NAME)
+
+	// connect mongodb //
+	db, err := mongodb.ConnectDB(ctx, config.DB)
+	if err != nil {
+		slog.Error("Error initializing database connection", "error", err)
+		os.Exit(1)
+	}
+	defer db.Close(ctx)
+
+	// connect redis //
+	redisOptions := &redis.Options{
+		Addr:     config.Redis.REDIS_PORT,
+		Password: config.Redis.REDIS_PASSWORD,
+		DB:       config.Redis.REDIS_DB,
+	}
+	redisClient := redis.NewClient(redisOptions)
+	cacheClient, err := cache.ConnectedRedis(ctx, config.Redis)
+	if err != nil {
+		slog.Error("Error initializing cache connection", "error", err)
+		os.Exit(1)
+	}
+
+	// Category //
+	categoryRepo := repository.NewCategoryRepositoryMongo(db)
+	categoryService := service.NewCategoryService(categoryRepo)
+	categoryHandler := handler.NewCategoryHandler(categoryService)
+
+	// News //
+	newsRepo := repository.NewNewsRepo(db, redisClient)
+	newService := service.NewsService(newsRepo, categoryRepo)
+	newHandler := handler.NewNewsHandler(newService, categoryRepo, cacheClient)
+
+	// run server from server.go //
+	router, err := handler.SetUpRoutes(handler.RouterParams{
+		Config:          config.HTTP,
+		NewsHandler:     *newHandler,
+		CategoryHandler: *categoryHandler,
+	})
+	if err != nil {
+
+	}
+
+	//read address from config//
+	listenAddr := fmt.Sprintf("%s:%s", config.HTTP.URL, config.HTTP.Port)
+	err = router.Serve(listenAddr)
+	if err != nil {
+
+	}
+
+}
+
 // @description This is a sample server for a News API.
 // @version 1.0
 // @host localhost:5050
@@ -27,38 +88,11 @@ import (
 // @name Authorization
 func main() {
 
-	app := fiber.New()
-
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: "http://localhost:3000 , http://127.0.0.1:3000",
-		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH",
-		AllowHeaders: "Origin, Content-Type, Accept",
-	}))
-
-	app.Get("/swagger/*", swagger.HandlerDefault)
-	redis.ConnectedRedis()
-
-	// debug : if redis disconnected //
-	if redis.RedisClient == nil {
-		log.Fatal("❌ RedisClient is still nil after ConnectedRedis()")
-	} else {
-		log.Println("✅ RedisClient initialized:", redis.RedisClient)
+	config, err := config.New()
+	if err != nil {
+		return
 	}
 
-	mongodb.ConnectDB()
+	Init(config)
 
-	//Redis//
-	cacheRepo := redis.NewRedisCacheRepository(redis.RedisClient)
-
-	// news //
-	categoryRepo := repository.NewCategoryRepositoryMongo(mongodb.GetDatabase())
-	categoryService := service.NewCategoryService(categoryRepo)
-	categoryHandler := handler.NewCategoryHandler(categoryService)
-
-	newsRepo := repository.NewNewsRepo(mongodb.GetDatabase(), redis.RedisClient)
-	newService := service.NewsService(newsRepo, categoryRepo)
-	newHandler := handler.NewNewsHandler(newService, categoryRepo, cacheRepo)
-
-	routh.SetUpRoutes(app, newHandler, categoryHandler)
-	app.Listen(":5050")
 }
