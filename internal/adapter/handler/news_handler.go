@@ -6,10 +6,10 @@ import (
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
 	"context"
-	"encoding/base64"
 	"fmt"
-	"io"
 	"log"
+	"os"
+	"path/filepath"
 
 	"strconv"
 	"time"
@@ -31,6 +31,13 @@ func NewNewsHandler(service port.NewsService, CategoryService port.CategoryRepos
 		CategoryService: CategoryService,
 		cacheService:    cacheService,
 	}
+}
+
+type ImageDataResponse struct {
+	ImagePath string `json:"ImagePath"`
+	ImageName string `json:"imageName"`
+	Width     int    `json:"width"`
+	Height    int    `json:"height"`
 }
 
 // CreateNews godoc
@@ -58,22 +65,32 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 		})
 	}
 
-	fileContent, err := file.Open()
-	if err != nil {
+	randomUUID := utils.GenerateUUID()
+	fileEXT := filepath.Ext(file.Filename)
+	fileName := randomUUID + fileEXT
+	savePath := fmt.Sprintf("./upload/image/%s", fileName)
+
+	tempDir := "./upload/image"
+	if _, err := os.Stat(tempDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(tempDir, os.ModePerm); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "cannot create folder",
+			})
+		}
+	}
+
+	if err := c.SaveFile(file, savePath); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Cannot open file",
+			"message": "Failed to save File",
 		})
 	}
-	defer fileContent.Close()
 
-	data, err := io.ReadAll(fileContent)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Cannot read file content",
-		})
+	imageData := domain.ImageData{
+		ImagePath: fmt.Sprintf("/upload/image/%s", fileName),
+		ImageName: file.Filename,
 	}
 
-	news.Image = base64.StdEncoding.EncodeToString(data)
+	fmt.Printf("imageData: %v\n", imageData)
 
 	// ดึงไอดีของ category มาเพื่อจะได้นำมาใส่ตอน create //
 	category, _ := h.CategoryService.GetByID(news.Category)
@@ -81,9 +98,10 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 	newNews := domain.News{
 		Title:      news.Title,
 		Detail:     news.Detail,
-		Image:      news.Image,
+		Image:      imageData,
 		CategoryID: category,
-		Tag:        news.Tag,
+		CreatedAt:  time.Now().Format(time.RFC3339),
+		UpdatedAt:  time.Now().Format(time.RFC3339),
 	}
 
 	if err := h.service.Create(&newNews); err != nil {
@@ -128,14 +146,6 @@ func (h *NewsHandler) GetNewsByPage(c *fiber.Ctx) error {
 		})
 	}
 
-	for i := range news {
-		if err := utils.ProcessImageToURL(&news[i]); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
-				Error: "Failed to process image.",
-			})
-		}
-	}
-
 	return c.JSON(fiber.Map{
 		"data":   news,
 		"limit":  limit,
@@ -156,12 +166,6 @@ func (h *NewsHandler) GetNewsByID(c *fiber.Ctx) error {
 		log.Println(err)
 		return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
 			Error: "Cannot Fetch Dataa.",
-		})
-	}
-
-	if err := utils.ProcessImageToURL(news); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
-			Error: "Failed to process image.",
 		})
 	}
 
@@ -190,14 +194,6 @@ func (h *NewsHandler) GetNewsByCategory(c *fiber.Ctx) error {
 
 	// instance ดึงตัว name category เพื่อนำไปแสดงใน response //
 	categoryName := newsList[0].CategoryID.Name
-
-	for i := range newsList {
-		if err := utils.ProcessImageToURL(&newsList[i]); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
-				Error: "Failed to process image.",
-			})
-		}
-	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"category": categoryName,
@@ -248,9 +244,9 @@ func (h *NewsHandler) UpdateNews(c *fiber.Ctx) error {
 		existingNews.Detail = news.Detail
 	}
 
-	if news.Image != "" {
-		existingNews.Image = news.Image
-	}
+	// if news.Image != "" {
+	// 	existingNews.Image = news.Image
+	// }
 
 	if news.Category != "" {
 		category, err := h.CategoryService.GetByID(news.Category)
@@ -262,9 +258,9 @@ func (h *NewsHandler) UpdateNews(c *fiber.Ctx) error {
 		existingNews.CategoryID = &domain.Category{ID: category.ID, Name: category.Name}
 	}
 
-	if len(news.Tag) > 0 {
-		existingNews.Tag = news.Tag
-	}
+	// if len(news.Tag) > 0 {
+	// 	existingNews.Tag = news.Tag
+	// }
 
 	loc, _ := time.LoadLocation("Asia/Bangkok")
 	news.UpdatedAt = time.Now().In(loc).Format(time.RFC3339)

@@ -38,11 +38,6 @@ func (n *NewsServiceImpl) Create(news *d.News) error {
 		}
 	}
 
-	// ถ้าไม่มี input เข้ามาเ  ให้ default เป็น Untagged //
-	if len(news.Tag) == 0 {
-		news.Tag = append(news.Tag, "Untagged")
-	}
-
 	news.CreatedAt, news.UpdatedAt = utils.SetTimestamps()
 
 	return n.repo.Create(news)

@@ -26,7 +26,7 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 	app := fiber.New()
 
 	app.Get("/swagger/*", swagger.HandlerDefault)
-
+	app.Static("/upload/image", "./upload/image")
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     p.Config.HttpOrigins,
 		AllowHeaders:     "Origin, Content-Type, Accept",
@@ -46,13 +46,6 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			news.Get("/", p.NewsHandler.GetNewsByPage)
 			news.Put("/:id", p.NewsHandler.UpdateNews)
 			news.Delete("/:id", p.NewsHandler.DeleteNews)
-			news.Get("/uploads/:filename", func(c *fiber.Ctx) error {
-				filename := c.Params("filename")
-				directory := "./internal/core/upload"
-				filePath := directory + "/" + filename
-
-				return c.SendFile(filePath)
-			})
 		}
 
 		category := v1.Group("/category")
