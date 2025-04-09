@@ -3,13 +3,13 @@ package repository
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	dt "backend_tech_movement_hex/internal/core/domain"
-	"context"
+	"backend_tech_movement_hex/internal/core/utils"
 	"log"
-	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MongoTagsRepository struct {
@@ -22,7 +22,7 @@ func NewTagRepo(db mongodb.Database) *MongoTagsRepository {
 
 func (t *MongoTagsRepository) SavaTags(tags dt.Tags) error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	tags.ID = primitive.NewObjectID()
@@ -43,7 +43,7 @@ func (t *MongoTagsRepository) GetTagsById(id string) (*dt.Tags, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	var tags dt.Tags
@@ -56,4 +56,94 @@ func (t *MongoTagsRepository) GetTagsById(id string) (*dt.Tags, error) {
 	}
 
 	return &tags, nil
+}
+
+func (t *MongoTagsRepository) GetAllTags() ([]dt.Tags, error) {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	var tags []dt.Tags
+	cursor, err := t.collection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, bson.ErrDecodeToNil
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var loopTags dt.Tags
+		if err := cursor.Decode(&loopTags); err != nil {
+			log.Println("Error decoding category:", err)
+			continue
+		}
+		tags = append(tags, loopTags)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return tags, nil
+}
+
+func (t *MongoTagsRepository) EditTags(id string, tags dt.Tags) error {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	ObjId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"name": tags.Name,
+		},
+	}
+
+	_, err = t.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": ObjId},
+		update,
+		options.Update().SetUpsert(true),
+	)
+
+	return err
+}
+
+func (t *MongoTagsRepository) DeleteTags(id string) error {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	ObjId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	result := t.collection.FindOneAndDelete(ctx, bson.M{"_id": ObjId})
+	if result.Err() != nil {
+		return result.Err()
+	}
+
+	return nil
+}
+
+func (t *MongoTagsRepository) ExistsByName(name string) (bool, error) {
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	// ค้นหา database ว่ามี name ซ้ำกันยุบ่ //
+	filter := bson.M{"name": name}
+	var result bson.M
+
+	err := t.collection.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

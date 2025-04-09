@@ -5,6 +5,7 @@ import (
 	d "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
+	"log"
 )
 
 type NewsServiceImpl struct {
@@ -56,6 +57,23 @@ func (n *NewsServiceImpl) UpdateNews(id string, news *d.News) error {
 }
 
 func (n *NewsServiceImpl) Delete(id string) error {
+
+	news, err := n.repo.GetNewsByID(id)
+	if err != nil {
+		return err
+	}
+
+	if err := n.repo.Delete(id); err != nil {
+		return err
+	}
+
+	if news.Image.ImagePath != "" {
+		err := n.repo.DeleteImg(news.Image.ImagePath)
+		if err != nil {
+			log.Println("Failed to delete image:", err)
+		}
+	}
+
 	return n.repo.Delete(id)
 }
 

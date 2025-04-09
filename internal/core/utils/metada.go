@@ -2,7 +2,9 @@ package utils
 
 import (
 	"image"
+	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/google/uuid"
 )
@@ -23,4 +25,17 @@ func GetImageDimensions(filePath string) (int, int) {
 
 func GenerateUUID() string {
 	return uuid.New().String()
+}
+
+func DeleteImageFiles(fileName string) {
+	if fileName == "" {
+		return
+	}
+
+	path := filepath.Join("./upload/image", fileName)
+
+	err := os.Remove(path)
+	if err != nil && !os.IsNotExist(err) {
+		log.Printf("Failed to delete file: %s, error: %v", path, err)
+	}
 }

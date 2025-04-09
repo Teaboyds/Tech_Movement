@@ -4,10 +4,12 @@ package repository
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	d "backend_tech_movement_hex/internal/core/domain"
+	"backend_tech_movement_hex/internal/core/utils"
 	"context"
 	"encoding/json"
 	"errors"
 	"log"
+	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -168,7 +170,7 @@ func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
 }
 
 func (n *MongoNewsRepository) Delete(id string) error {
-	ctx, cancle := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancle := utils.NewTimeoutContext()
 	defer cancle()
 
 	objID, err := primitive.ObjectIDFromHex(id)
@@ -176,11 +178,35 @@ func (n *MongoNewsRepository) Delete(id string) error {
 		return err
 	}
 
-	result := n.collection.FindOneAndDelete(ctx, bson.M{"_id": objID})
-	if result.Err() != nil {
-		return result.Err()
+	result, err := n.collection.DeleteOne(ctx, bson.M{"_id": objID})
+	if err != nil {
+		return err
 	}
 
+	if result.DeletedCount == 0 {
+		return err
+	}
+
+	return nil
+}
+
+func (n *MongoNewsRepository) DeleteImg(path string) error {
+	fullPath := "." + path // หรือใช้ absolute root path หากต้องการ
+
+	// เช็คก่อนว่าไฟล์มีอยู่หรือไม่
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		log.Printf("⚠️ Image not found at: %s", fullPath)
+		return nil // หรือจะ return error ก็ได้ตาม use case
+	}
+
+	// ลบไฟล์
+	err := os.Remove(fullPath)
+	if err != nil {
+		log.Printf("❌ Failed to delete image at %s: %v", fullPath, err)
+		return err
+	}
+
+	log.Printf("✅ Image deleted: %s", fullPath)
 	return nil
 }
 

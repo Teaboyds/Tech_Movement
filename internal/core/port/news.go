@@ -12,6 +12,7 @@ type NewsRepository interface {
 	GetNewsByTags(name string) ([]d.News, error)
 	UpdateNews(id string, news *d.News) error
 	Delete(id string) error
+	DeleteImg(path string) error
 }
 
 type NewsService interface {

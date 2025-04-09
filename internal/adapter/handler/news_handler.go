@@ -291,6 +291,7 @@ func (h *NewsHandler) DeleteNews(c *fiber.Ctx) error {
 
 	err = h.service.Delete(id)
 	if err != nil {
+		log.Println(err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Cannot Delete News cause Internal Server Error ",
 		})
@@ -299,4 +300,5 @@ func (h *NewsHandler) DeleteNews(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "News Delete Successfully",
 	})
+
 }
