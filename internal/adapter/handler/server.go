@@ -19,6 +19,7 @@ type RouterParams struct {
 	Config          *config.HTTP
 	NewsHandler     NewsHandler
 	CategoryHandler CategoryHandler
+	TagsHandler     TagsHandler
 }
 
 func SetUpRoutes(p RouterParams) (*Router, error) {
@@ -42,7 +43,7 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 		{
 			news.Post("/", p.NewsHandler.CreateNews)
 			news.Get("/:id", p.NewsHandler.GetNewsByID)
-			news.Get("/category/:id", p.NewsHandler.GetNewsByCategory)
+			news.Get("/byCategory/:id", p.NewsHandler.GetNewsByCategory)
 			news.Get("/", p.NewsHandler.GetNewsByPage)
 			news.Put("/:id", p.NewsHandler.UpdateNews)
 			news.Delete("/:id", p.NewsHandler.DeleteNews)
@@ -55,6 +56,15 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			category.Get("/", p.CategoryHandler.GetAllCategory)
 			category.Put("/:id", p.CategoryHandler.UpdateCategory)
 			category.Delete("/:id", p.CategoryHandler.DeleteCategory)
+		}
+
+		tags := v1.Group("/tags")
+		{
+			tags.Post("/", p.TagsHandler.CreateTags)
+			tags.Get("/:id", p.TagsHandler.GetTagsByID)
+			tags.Get("/", p.TagsHandler.GetAll)
+			tags.Put("/:id", p.TagsHandler.UpdateTag)
+			tags.Delete("/:id", p.TagsHandler.DeleteTag)
 		}
 	}
 

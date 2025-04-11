@@ -24,7 +24,9 @@ func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 	}
 
 	if err := h.CategoryService.Create(category); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create category "})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to create category ",
+		})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -56,7 +58,7 @@ func (h *CategoryHandler) GetAllCategory(c *fiber.Ctx) error {
 	category, err := h.CategoryService.GetAll()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "cannot fect category data",
+			"message": "cannot fecth category data",
 		})
 	}
 

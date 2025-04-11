@@ -22,10 +22,16 @@ import (
 type NewsHandler struct {
 	service         port.NewsService
 	CategoryService port.CategoryRepository
+	TagsService     port.TagsService
 	cacheService    port.CacheRepository
 }
 
-func NewNewsHandler(service port.NewsService, CategoryService port.CategoryRepository, cacheService port.CacheRepository) *NewsHandler {
+func NewNewsHandler(
+	service port.NewsService,
+	CategoryService port.CategoryRepository,
+	cacheService port.CacheRepository,
+	TagsService port.TagsService,
+) *NewsHandler {
 	return &NewsHandler{
 		service:         service,
 		CategoryService: CategoryService,
@@ -94,12 +100,21 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 
 	// ดึงไอดีของ category มาเพื่อจะได้นำมาใส่ตอน create //
 	category, _ := h.CategoryService.GetByID(news.Category)
+	tagIDs := make([]primitive.ObjectID, 0)
+	for _, idStr := range news.Tag {
+		id, err := primitive.ObjectIDFromHex(idStr)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid tag id"})
+		}
+		tagIDs = append(tagIDs, id)
+	}
 
 	newNews := domain.News{
 		Title:      news.Title,
 		Detail:     news.Detail,
 		Image:      imageData,
 		CategoryID: category,
+		Tag:        &tagIDs,
 		CreatedAt:  time.Now().Format(time.RFC3339),
 		UpdatedAt:  time.Now().Format(time.RFC3339),
 	}
@@ -135,8 +150,6 @@ func (h *NewsHandler) GetNewsByPage(c *fiber.Ctx) error {
 	if err != nil || limit < 1 {
 		limit = 10
 	}
-
-	fmt.Println(lastID)
 
 	news, err := h.service.GetNewsPagination(lastID, limit)
 	if err != nil {

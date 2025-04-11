@@ -11,12 +11,14 @@ import (
 type NewsServiceImpl struct {
 	repo         *repository.MongoNewsRepository
 	categoryRepo port.CategoryRepository
+	tagsRepo     port.TagsRepository
 }
 
-func NewsService(repo *repository.MongoNewsRepository, categoryRepo port.CategoryRepository) port.NewsService {
+func NewsService(repo *repository.MongoNewsRepository, categoryRepo port.CategoryRepository, tagsRepo port.TagsRepository) port.NewsService {
 	return &NewsServiceImpl{
 		repo:         repo,
 		categoryRepo: categoryRepo,
+		tagsRepo:     tagsRepo,
 	}
 }
 

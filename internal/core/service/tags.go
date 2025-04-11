@@ -1,22 +1,24 @@
 package service
 
 import (
-	r "backend_tech_movement_hex/internal/adapter/storage/mongodb/repository"
 	dt "backend_tech_movement_hex/internal/core/domain"
-	"errors"
+	"backend_tech_movement_hex/internal/core/port"
 	"fmt"
-	"strings"
 )
 
-type TagsService struct {
-	Tagrepo r.MongoTagsRepository
+type TagsServiceImpl struct {
+	Tagrepo port.TagsRepository
 }
 
-func TagsServiceImpl(Tagrepo r.MongoTagsRepository) *TagsService {
-	return &TagsService{Tagrepo: Tagrepo}
+func TagsService(Tagrepo port.TagsRepository) *TagsServiceImpl {
+	return &TagsServiceImpl{Tagrepo: Tagrepo}
 }
 
-func (tr *TagsService) CreateTags(tags dt.Tags) error {
+func (tr *TagsServiceImpl) CreateTags(tags *dt.Tags) error {
+
+	if tags.Name == "" {
+		return fmt.Errorf("tag name is required")
+	}
 
 	existingName, err := tr.Tagrepo.ExistsByName(tags.Name)
 	if err != nil {
@@ -30,13 +32,27 @@ func (tr *TagsService) CreateTags(tags dt.Tags) error {
 	return tr.Tagrepo.SavaTags(tags)
 }
 
-var ErrTagIdNotProvided = errors.New("tag id is required")
+func (tr *TagsServiceImpl) GetTagsByIdArray(id []string) ([]*dt.Tags, error) {
+	return tr.Tagrepo.GetTagsByIdArray(id)
+}
 
-func (tr *TagsService) GetTagsById(id string) (*dt.Tags, error) {
+func (tr *TagsServiceImpl) GetTagsAll() ([]dt.Tags, error) {
+	return tr.Tagrepo.GetAllTags()
+}
 
-	if strings.TrimSpace(id) == "" {
-		return nil, ErrTagIdNotProvided
+func (tr *TagsServiceImpl) UpdateTags(id string, tags *dt.Tags) error {
+
+	if tags.Name == "" {
+		return fmt.Errorf("tag name is required")
 	}
 
-	return tr.Tagrepo.GetTagsById(id)
+	return tr.Tagrepo.EditTags(id, tags)
+}
+
+func (tr *TagsServiceImpl) DeleteTags(id string) error {
+	return tr.Tagrepo.DeleteTags(id)
+}
+
+func (tr *TagsServiceImpl) GetByID(id string) (*dt.Tags, error) {
+	return tr.Tagrepo.GetByID(id)
 }

@@ -2,8 +2,11 @@ package repository
 
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
+	"backend_tech_movement_hex/internal/core/domain"
 	dt "backend_tech_movement_hex/internal/core/domain"
+	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
+	"fmt"
 	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -16,11 +19,11 @@ type MongoTagsRepository struct {
 	collection *mongo.Collection
 }
 
-func NewTagRepo(db mongodb.Database) *MongoTagsRepository {
+func NewTagRepo(db *mongodb.Database) port.TagsRepository {
 	return &MongoTagsRepository{collection: db.Collection("tags")}
 }
 
-func (t *MongoTagsRepository) SavaTags(tags dt.Tags) error {
+func (t *MongoTagsRepository) SavaTags(tags *dt.Tags) error {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
@@ -36,26 +39,47 @@ func (t *MongoTagsRepository) SavaTags(tags dt.Tags) error {
 	return nil
 }
 
-func (t *MongoTagsRepository) GetTagsById(id string) (*dt.Tags, error) {
+// look up get ตอน ข่าวใหย่ //
+func (t *MongoTagsRepository) GetTagsByIdArray(id []string) ([]*dt.Tags, error) {
 
-	ObjID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
+	var ObjIDs []primitive.ObjectID
+
+	// loop id แล้วเก็บว้ายนาย ObjIDs //
+	for _, ids := range id {
+		objID, err := primitive.ObjectIDFromHex(ids)
+		if err != nil {
+			return nil, err
+		}
+		ObjIDs = append(ObjIDs, objID)
 	}
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	var tags dt.Tags
+	// filter หา id ใน ObjIDs //
+	filter := bson.M{"_id": bson.M{"$in": ObjIDs}}
 
-	filter := bson.M{"_id": ObjID}
-
-	err = t.collection.FindOne(ctx, filter).Decode(&tags)
+	cursor, err := t.collection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 
-	return &tags, nil
+	defer cursor.Close(ctx)
+
+	var tags []*dt.Tags
+	for cursor.Next(ctx) {
+		var tag dt.Tags
+		if err := cursor.Decode(&tag); err != nil {
+			return nil, err
+		}
+		tags = append(tags, &tag)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return tags, err
 }
 
 func (t *MongoTagsRepository) GetAllTags() ([]dt.Tags, error) {
@@ -86,7 +110,7 @@ func (t *MongoTagsRepository) GetAllTags() ([]dt.Tags, error) {
 	return tags, nil
 }
 
-func (t *MongoTagsRepository) EditTags(id string, tags dt.Tags) error {
+func (t *MongoTagsRepository) EditTags(id string, tags *dt.Tags) error {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
@@ -146,4 +170,43 @@ func (t *MongoTagsRepository) ExistsByName(name string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (t *MongoTagsRepository) GetByName(name string) ([]dt.Tags, error) {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	var tags []domain.Tags
+	err := t.collection.FindOne(ctx, bson.M{"name": name}).Decode(&tags)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, err
+		}
+		return nil, err
+	}
+
+	return tags, err
+}
+
+func (t *MongoTagsRepository) GetByID(id string) (*dt.Tags, error) {
+
+	ObjID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid object ID%w", err)
+	}
+
+	var tags domain.Tags
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	filter := bson.M{"_id": ObjID}
+
+	err = t.collection.FindOne(ctx, filter).Decode(&tags)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tags, nil
 }
