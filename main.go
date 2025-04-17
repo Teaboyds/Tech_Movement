@@ -51,22 +51,16 @@ func Init(config *config.Container) {
 	categoryService := service.NewCategoryService(categoryRepo)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 
-	// Tags //
-	tagsRepo := repository.NewTagRepo(db)
-	tagsService := service.TagsService(tagsRepo)
-	tagsHandler := handler.NewTagsHandler(tagsService)
-
 	// News //
 	newsRepo := repository.NewNewsRepo(db, redisClient)
-	newService := service.NewsService(newsRepo, categoryRepo, tagsRepo)
-	newHandler := handler.NewNewsHandler(newService, categoryRepo, cacheClient, tagsService)
+	newService := service.NewsService(newsRepo, categoryRepo)
+	newHandler := handler.NewNewsHandler(newService, categoryRepo, cacheClient)
 
 	// run server from server.go //
 	router, err := handler.SetUpRoutes(handler.RouterParams{
 		Config:          config.HTTP,
 		NewsHandler:     *newHandler,
 		CategoryHandler: *categoryHandler,
-		TagsHandler:     *tagsHandler,
 	})
 	if err != nil {
 		logger.Error("Error initializing router" + "error" + err.Error())

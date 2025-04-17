@@ -4,9 +4,9 @@ import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
+	"backend_tech_movement_hex/internal/core/utils"
 	"context"
 	"log"
-	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -38,7 +38,7 @@ func (cat *MongoCategoryRepository) GetByID(id string) (*domain.Category, error)
 
 	var category domain.Category
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	filter := bson.M{"_id": ObjID}
@@ -91,7 +91,7 @@ func (cat *MongoCategoryRepository) GetAll() ([]domain.Category, error) {
 
 func (cat *MongoCategoryRepository) UpdateCategory(id string, category *domain.Category) error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	ObjId, err := primitive.ObjectIDFromHex(id)
@@ -116,7 +116,7 @@ func (cat *MongoCategoryRepository) UpdateCategory(id string, category *domain.C
 }
 
 func (cat *MongoCategoryRepository) DeleteCategory(id string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	ObjId, err := primitive.ObjectIDFromHex(id)
@@ -135,7 +135,7 @@ func (cat *MongoCategoryRepository) DeleteCategory(id string) error {
 
 func (cat *MongoCategoryRepository) ExistsByName(name string) (bool, error) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	// ค้นหา database ว่ามี name ซ้ำกันยุบ่ //

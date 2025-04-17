@@ -45,5 +45,5 @@ func (cats *CategoryService) UpdateCategory(id string, category *domain.Category
 }
 
 func (cats *CategoryService) DeleteCategory(id string) error {
-	return cats.CatRepo.DeleteCategory(id)
+	return nil
 }

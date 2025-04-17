@@ -5,7 +5,6 @@ import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	d "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/utils"
-	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -33,7 +32,7 @@ func NewNewsRepo(db *mongodb.Database, redisClient *redis.Client) *MongoNewsRepo
 
 func (n *MongoNewsRepository) Create(news *d.News) error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	news.ID = primitive.NewObjectID()
@@ -45,7 +44,7 @@ func (n *MongoNewsRepository) Create(news *d.News) error {
 func (n *MongoNewsRepository) GetNewsPagination(lastID string, limit int) ([]d.News, error) {
 
 	var news []d.News
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	// cursor based pagination //
@@ -83,7 +82,7 @@ func (n *MongoNewsRepository) GetNewsPagination(lastID string, limit int) ([]d.N
 
 func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 	var news d.News
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	// แปลงค่า string ที่อยู่ในรูปแบบ Hexadecimal ให้กลายเป็น primitive.ObjectID //
@@ -140,7 +139,7 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 }
 
 func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	objID, err := primitive.ObjectIDFromHex(id)
@@ -150,12 +149,14 @@ func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
 
 	update := bson.M{
 		"$set": bson.M{
-			"title":       news.Title,
-			"detail":      news.Detail,
-			"image":       news.Image,
-			"category_id": news.CategoryID,
-			"tag":         news.Tag,
-			"updated_at":  news.UpdatedAt,
+			"title":          news.Title,
+			"detail":         news.Detail,
+			"image":          news.Image,
+			"category_id":    news.CategoryID,
+			"tag":            news.Tag,
+			"status":         news.Status,
+			"content_status": news.ContentStatus,
+			"updated_at":     news.UpdatedAt,
 		},
 	}
 
@@ -184,19 +185,20 @@ func (n *MongoNewsRepository) Delete(id string) error {
 	}
 
 	if result.DeletedCount == 0 {
-		return err
+		log.Printf("No news found with ID: %s", id)
+		return errors.New("news not found or already deleted")
 	}
 
 	return nil
 }
 
 func (n *MongoNewsRepository) DeleteImg(path string) error {
-	fullPath := "." + path // หรือใช้ absolute root path หากต้องการ
+	fullPath := "./upload/image/" + path // หรือใช้ absolute root path หากต้องการ
 
 	// เช็คก่อนว่าไฟล์มีอยู่หรือไม่
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		log.Printf("⚠️ Image not found at: %s", fullPath)
-		return nil // หรือจะ return error ก็ได้ตาม use case
+		return nil
 	}
 
 	// ลบไฟล์
@@ -213,7 +215,7 @@ func (n *MongoNewsRepository) DeleteImg(path string) error {
 func (n *MongoNewsRepository) GetNewsByCategory(CategoryId string) ([]d.News, error) {
 
 	var newsList []d.News
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	ObjID, err := primitive.ObjectIDFromHex(CategoryId)
@@ -240,7 +242,7 @@ func (n *MongoNewsRepository) GetNewsByCategory(CategoryId string) ([]d.News, er
 func (n *MongoCategoryRepository) GetNewsByTags(name string) ([]d.News, error) {
 
 	var news []d.News
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	filter := bson.M{"tags": name}

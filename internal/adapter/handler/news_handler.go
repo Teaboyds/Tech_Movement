@@ -8,8 +8,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
+	"strings"
 
 	"strconv"
 	"time"
@@ -22,7 +21,6 @@ import (
 type NewsHandler struct {
 	service         port.NewsService
 	CategoryService port.CategoryRepository
-	TagsService     port.TagsService
 	cacheService    port.CacheRepository
 }
 
@@ -30,7 +28,6 @@ func NewNewsHandler(
 	service port.NewsService,
 	CategoryService port.CategoryRepository,
 	cacheService port.CacheRepository,
-	TagsService port.TagsService,
 ) *NewsHandler {
 	return &NewsHandler{
 		service:         service,
@@ -59,64 +56,41 @@ type ImageDataResponse struct {
 // @Failure 500 {object} domain.ErrResponse
 // @Router /news [post]
 func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
-	var news UpdateNewsRequest
-	if err := c.BodyParser(&news); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid News input"})
+
+	title := c.FormValue("title")
+	detail := c.FormValue("detail")
+	statusStr := c.FormValue("status")
+	contentStatus := c.FormValue("content_status")
+	categoryID := c.FormValue("category")
+	tag := c.FormValue("tag")
+
+	if !utils.IsValidContentStatus(contentStatus) {
+		log.Printf("Invalid content status received: %s", contentStatus)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Content Status"})
 	}
 
-	file, err := c.FormFile("image")
+	status := statusStr == "true"
+
+	tagList := strings.Split(tag, ",")
+
+	fileName, err := utils.UploadFile(c, "image", 5*1024*1024, "./upload/image")
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": err,
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
 	}
 
-	randomUUID := utils.GenerateUUID()
-	fileEXT := filepath.Ext(file.Filename)
-	fileName := randomUUID + fileEXT
-	savePath := fmt.Sprintf("./upload/image/%s", fileName)
-
-	tempDir := "./upload/image"
-	if _, err := os.Stat(tempDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(tempDir, os.ModePerm); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "cannot create folder",
-			})
-		}
-	}
-
-	if err := c.SaveFile(file, savePath); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Failed to save File",
-		})
-	}
-
-	imageData := domain.ImageData{
-		ImagePath: fmt.Sprintf("/upload/image/%s", fileName),
-		ImageName: file.Filename,
-	}
-
-	fmt.Printf("imageData: %v\n", imageData)
-
-	// ดึงไอดีของ category มาเพื่อจะได้นำมาใส่ตอน create //
-	category, _ := h.CategoryService.GetByID(news.Category)
-	tagIDs := make([]primitive.ObjectID, 0)
-	for _, idStr := range news.Tag {
-		id, err := primitive.ObjectIDFromHex(idStr)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid tag id"})
-		}
-		tagIDs = append(tagIDs, id)
-	}
+	// ดึงไอดีของ cat มาเพื่อจะได้นำมาใส่ตอน create //
+	category, _ := h.CategoryService.GetByID(categoryID)
 
 	newNews := domain.News{
-		Title:      news.Title,
-		Detail:     news.Detail,
-		Image:      imageData,
-		CategoryID: category,
-		Tag:        &tagIDs,
-		CreatedAt:  time.Now().Format(time.RFC3339),
-		UpdatedAt:  time.Now().Format(time.RFC3339),
+		Title:         title,
+		Detail:        detail,
+		Image:         fileName,
+		CategoryID:    category,
+		Tag:           tagList,
+		Status:        status,
+		ContentStatus: contentStatus,
+		CreatedAt:     time.Now().Format(time.RFC3339),
+		UpdatedAt:     time.Now().Format(time.RFC3339),
 	}
 
 	if err := h.service.Create(&newNews); err != nil {
@@ -178,7 +152,7 @@ func (h *NewsHandler) GetNewsByID(c *fiber.Ctx) error {
 		}
 		log.Println(err)
 		return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
-			Error: "Cannot Fetch Dataa.",
+			Error: "Cannot Fetch News Data.",
 		})
 	}
 
@@ -214,72 +188,75 @@ func (h *NewsHandler) GetNewsByCategory(c *fiber.Ctx) error {
 	})
 }
 
-// build struct มารับ request อย่างเดียว //
-type UpdateNewsRequest struct {
-	Title     string   `json:"title"`
-	Detail    string   `json:"detail"`
-	Image     string   `json:"image"`
-	Category  string   `json:"category"`
-	Tag       []string `json:"tag"`
-	UpdatedAt string   `json:"updated_at"`
-}
-
 func (h *NewsHandler) UpdateNews(c *fiber.Ctx) error {
 	id := c.Params("id")
-	var news UpdateNewsRequest
 
-	if err := c.BodyParser(&news); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Update News input"})
-	}
-
-	fmt.Println(news.Category)
-
-	_, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
+	if _, err := primitive.ObjectIDFromHex(id); err != nil {
 		log.Println("Invalid ObjectID format:", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid ObjectID",
 		})
 	}
 
+	// ดึงข่าวมาเปรียบเทียบ //
 	existingNews, err := h.service.GetNewsByID(id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to retrieve the news. Please try again later.",
 		})
 	}
+	oldImg := existingNews.Image
 
-	if news.Title != "" {
-		existingNews.Title = news.Title
+	title := c.FormValue("title")
+	detail := c.FormValue("detail")
+	statusStr := c.FormValue("status")
+	contentStatus := c.FormValue("content_status")
+	categoryID := c.FormValue("category")
+	tag := c.FormValue("tag")
+
+	if !utils.IsValidContentStatus(contentStatus) {
+		log.Printf("Invalid content status: %s", contentStatus)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Content Status"})
 	}
 
-	if news.Detail != "" {
-		existingNews.Detail = news.Detail
-	}
+	status := statusStr == "true"
+	tagList := strings.Split(tag, ",")
 
-	// if news.Image != "" {
-	// 	existingNews.Image = news.Image
-	// }
-
-	if news.Category != "" {
-		category, err := h.CategoryService.GetByID(news.Category)
+	newfile := oldImg
+	if file, err := c.FormFile("image"); err == nil && file != nil {
+		newfile, err = utils.UploadFile(c, "image", 5*1024*1024, "./upload/image")
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to retrieve the news. Please try again later.",
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
+
+	if categoryID != "" {
+		category, err := h.CategoryService.GetByID(categoryID)
+		if err != nil {
+			log.Println(err)
+			return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
+				Error: "Failed to retrieve category",
 			})
 		}
-		existingNews.CategoryID = &domain.Category{ID: category.ID, Name: category.Name}
+		existingNews.CategoryID = category
 	}
 
-	// if len(news.Tag) > 0 {
-	// 	existingNews.Tag = news.Tag
-	// }
+	if title != "" {
+		existingNews.Title = title
+	}
+	if detail != "" {
+		existingNews.Detail = detail
+	}
+	if tag != "" {
+		existingNews.Tag = tagList
+	}
 
-	loc, _ := time.LoadLocation("Asia/Bangkok")
-	news.UpdatedAt = time.Now().In(loc).Format(time.RFC3339)
+	existingNews.Status = status
+	existingNews.ContentStatus = contentStatus
+	existingNews.Image = newfile
+	existingNews.UpdatedAt = time.Now().Format(time.RFC3339)
 
-	err = h.service.UpdateNews(id, existingNews)
-	if err != nil {
+	if err := h.service.UpdateNews(id, existingNews); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Cannot Update News cause Internal Server Error ",
 		})

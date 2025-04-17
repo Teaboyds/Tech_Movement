@@ -11,14 +11,12 @@ import (
 type NewsServiceImpl struct {
 	repo         *repository.MongoNewsRepository
 	categoryRepo port.CategoryRepository
-	tagsRepo     port.TagsRepository
 }
 
-func NewsService(repo *repository.MongoNewsRepository, categoryRepo port.CategoryRepository, tagsRepo port.TagsRepository) port.NewsService {
+func NewsService(repo *repository.MongoNewsRepository, categoryRepo port.CategoryRepository) port.NewsService {
 	return &NewsServiceImpl{
 		repo:         repo,
 		categoryRepo: categoryRepo,
-		tagsRepo:     tagsRepo,
 	}
 }
 
@@ -51,10 +49,34 @@ func (n *NewsServiceImpl) GetNewsPagination(lastID string, limit int) ([]d.News,
 }
 
 func (n *NewsServiceImpl) GetNewsByID(id string) (*d.News, error) {
-	return n.repo.GetNewsByID(id)
+
+	news, err := n.repo.GetNewsByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.AttachBaseURLToImage(news)
+
+	return news, nil
 }
 
 func (n *NewsServiceImpl) UpdateNews(id string, news *d.News) error {
+
+	existingNews, err := n.repo.GetNewsByID(id)
+	if err != nil {
+		return err
+	}
+
+	if news.Image != "" && existingNews.Image != "" && news.Image != existingNews.Image {
+		go func(oldImg string) {
+			if err := n.repo.DeleteImg(oldImg); err != nil {
+				log.Println("⚠️ Failed to delete old image during update:", err)
+			}
+		}(existingNews.Image)
+	}
+
+	news.CreatedAt, news.UpdatedAt = utils.SetTimestamps()
+
 	return n.repo.UpdateNews(id, news)
 }
 
@@ -69,14 +91,14 @@ func (n *NewsServiceImpl) Delete(id string) error {
 		return err
 	}
 
-	if news.Image.ImagePath != "" {
-		err := n.repo.DeleteImg(news.Image.ImagePath)
+	if news.Image != "" {
+		err := n.repo.DeleteImg(news.Image)
 		if err != nil {
 			log.Println("Failed to delete image:", err)
 		}
 	}
 
-	return n.repo.Delete(id)
+	return nil
 }
 
 func (n *NewsServiceImpl) GetNewsByCategory(CategoryId string) ([]d.News, error) {
