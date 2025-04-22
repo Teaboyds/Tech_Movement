@@ -42,7 +42,7 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 		{
 			news.Post("/", p.NewsHandler.CreateNews)
 			news.Get("/:id", p.NewsHandler.GetNewsByID)
-			news.Get("/byCategory/:id", p.NewsHandler.GetNewsByCategory)
+			// news.Get("/byCategory/:id", p.NewsHandler.GetNewsByCategory)
 			news.Get("/", p.NewsHandler.GetNewsByPage)
 			news.Put("/:id", p.NewsHandler.UpdateNews)
 			news.Delete("/:id", p.NewsHandler.DeleteNews)
@@ -55,6 +55,12 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			category.Get("/", p.CategoryHandler.GetAllCategory)
 			category.Put("/:id", p.CategoryHandler.UpdateCategory)
 			category.Delete("/:id", p.CategoryHandler.DeleteCategory)
+		}
+
+		home := v1.Group("/home")
+		{
+			home.Get("/lastedNews", p.NewsHandler.GetLastNews)
+			home.Get("/techNews/:id", p.NewsHandler.GetNewsByCategory)
 		}
 
 	}

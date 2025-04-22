@@ -10,5 +10,6 @@ type CacheRepository interface {
 	Get(ctx context.Context, key string, value interface{}) error
 	Delete(ctx context.Context, key string) error
 	DeletePattern(ctx context.Context, key string) error
+	IncrementVersion(ctx context.Context, key string) (int64, error)
 	IsKeyNotFound(err error) bool
 }

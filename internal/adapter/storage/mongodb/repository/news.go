@@ -5,13 +5,11 @@ import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	d "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/utils"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"os"
-	"time"
 
-	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,14 +18,33 @@ import (
 
 type MongoNewsRepository struct {
 	collection *mongo.Collection
-	redis      *redis.Client
 }
 
-func NewNewsRepo(db *mongodb.Database, redisClient *redis.Client) *MongoNewsRepository {
+func NewNewsRepo(db *mongodb.Database) *MongoNewsRepository {
 	return &MongoNewsRepository{
 		collection: db.Collection("news"),
-		redis:      redisClient,
 	}
+}
+
+// // index model ////
+func (n *MongoNewsRepository) EnsureIndexs() error {
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	indexModel := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "created_at", Value: -1}, // ใหม่ไปเก่า //
+			{Key: "category_id._id", Value: -1},
+			{Key: "status", Value: -1},
+			{Key: "content_status", Value: -1},
+			{Key: "content_type", Value: -1},
+			{Key: "_id", Value: -1},
+		},
+	}
+
+	_, err := n.collection.Indexes().CreateOne(ctx, indexModel)
+
+	return err
 }
 
 func (n *MongoNewsRepository) Create(news *d.News) error {
@@ -40,6 +57,8 @@ func (n *MongoNewsRepository) Create(news *d.News) error {
 
 	return err
 }
+
+///// Get Area ////
 
 func (n *MongoNewsRepository) GetNewsPagination(lastID string, limit int) ([]d.News, error) {
 
@@ -85,58 +104,113 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	// แปลงค่า string ที่อยู่ในรูปแบบ Hexadecimal ให้กลายเป็น primitive.ObjectID //
 	ObjID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
 
-	// debug if not found database or cache server der kub //
 	if n.collection == nil {
 		return nil, errors.New("mongoDB client is nil")
 	}
-	if n.redis == nil {
-		return nil, errors.New("redis client is nil")
-	}
 
-	cacheKey := "News_Keys_" + id
-	val, err := n.redis.Get(ctx, cacheKey).Result()
-
-	// if บ่เจอ cache เด้อครับ //
-	if err == redis.Nil {
-		// find id in database //
-		err = n.collection.FindOne(ctx, bson.M{"_id": ObjID}).Decode(&news)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				return nil, err
-			}
+	err = n.collection.FindOne(ctx, bson.M{"_id": ObjID}).Decode(&news)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
 			return nil, err
 		}
-
-		// แปลงร่าง struct เป็น json //
-		data, err := json.Marshal(news)
-		if err != nil {
-			return nil, err
-		}
-
-		// ละกะเซ็ทแคชไว้บาดนิ สิบนาที //
-		err = n.redis.Set(ctx, cacheKey, data, 10*time.Minute).Err()
-		if err != nil {
-			return nil, err
-		}
-	} else if err != nil {
 		return nil, err
-	} else {
-		// ถ้าพ้อ cache กะแปลง jsonมาเป็น struct
-		err = json.Unmarshal([]byte(val), &news)
-		if err != nil {
-			log.Println("Error unmarshaling data from Redis:", err)
-			return nil, err
-		}
 	}
 
 	return &news, nil
 }
+
+func (n *MongoNewsRepository) GetNewsByCategory(categoryID string, lastID string) ([]d.News, string, error) {
+
+	var newsList []d.News
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	objID, err := primitive.ObjectIDFromHex(categoryID)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid CategoryID: %v", err)
+	}
+
+	filter := bson.M{
+		"category_id._id": objID,
+		"status":          true,
+		"content_status":  "published",
+		"content_type":    "general",
+	}
+
+	if lastID != "" {
+		cursorID, err := primitive.ObjectIDFromHex(lastID)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid lastID: %v", err)
+		}
+		filter["_id"] = bson.M{"$lt": cursorID}
+	}
+
+	findOptions := options.Find().
+		SetProjection(bson.M{"tag": 0, "status": 0, "content_type": 0, "updated_at": 0}).
+		SetLimit(9).
+		SetSort(bson.D{{Key: "_id", Value: -1}})
+
+	cursor, err := n.collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, "", err
+	}
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &newsList); err != nil {
+		return nil, "", err
+	}
+
+	nextCursor := ""
+	if len(newsList) > 0 {
+		last := newsList[len(newsList)-1]
+		nextCursor = last.ID.Hex()
+	}
+
+	return newsList, nextCursor, nil
+}
+
+func (n *MongoNewsRepository) GetLastNews() ([]d.News, error) {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	var lastNews []d.News
+
+	findOptions := options.Find().
+		SetProjection(bson.M{"_id": 0, "tag": 0, "status": 0, "content_type": 0, "updated_at": 0}).
+		SetLimit(5).
+		SetSort(bson.D{{Key: "_id", Value: -1}})
+
+	filter := bson.M{
+		"status":         true,
+		"content_status": "published",
+		"content_type":   "general",
+	}
+
+	cursor, err := n.collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &lastNews); err != nil {
+		log.Printf("Error decoding repo last news: %v", err)
+		return nil, err
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return lastNews, nil
+}
+
+///// Get Area ////
 
 func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
 	ctx, cancel := utils.NewTimeoutContext()
@@ -156,6 +230,7 @@ func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
 			"tag":            news.Tag,
 			"status":         news.Status,
 			"content_status": news.ContentStatus,
+			"content_type":   news.ContentType,
 			"updated_at":     news.UpdatedAt,
 		},
 	}
@@ -193,15 +268,13 @@ func (n *MongoNewsRepository) Delete(id string) error {
 }
 
 func (n *MongoNewsRepository) DeleteImg(path string) error {
-	fullPath := "./upload/image/" + path // หรือใช้ absolute root path หากต้องการ
+	fullPath := "./upload/image/" + path
 
-	// เช็คก่อนว่าไฟล์มีอยู่หรือไม่
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		log.Printf("⚠️ Image not found at: %s", fullPath)
+		log.Printf("Mongo : Image not found at: %s", fullPath)
 		return nil
 	}
 
-	// ลบไฟล์
 	err := os.Remove(fullPath)
 	if err != nil {
 		log.Printf("❌ Failed to delete image at %s: %v", fullPath, err)
@@ -210,33 +283,6 @@ func (n *MongoNewsRepository) DeleteImg(path string) error {
 
 	log.Printf("✅ Image deleted: %s", fullPath)
 	return nil
-}
-
-func (n *MongoNewsRepository) GetNewsByCategory(CategoryId string) ([]d.News, error) {
-
-	var newsList []d.News
-	ctx, cancel := utils.NewTimeoutContext()
-	defer cancel()
-
-	ObjID, err := primitive.ObjectIDFromHex(CategoryId)
-	if err != nil {
-		return nil, err
-	}
-
-	filter := bson.M{
-		"category_id._id": ObjID,
-	}
-	cursor, err := n.collection.Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	if err = cursor.All(ctx, &newsList); err != nil {
-		return nil, err
-	}
-
-	return newsList, nil
 }
 
 func (n *MongoCategoryRepository) GetNewsByTags(name string) ([]d.News, error) {

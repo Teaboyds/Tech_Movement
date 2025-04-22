@@ -42,7 +42,7 @@ func (h *CategoryHandler) GetCategoryByID(c *fiber.Ctx) error {
 	category, err := h.CategoryService.GetByID(id)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(domain.ErrResponse{
-			Error: "News Not Found",
+			Error: "Category Not Found",
 		})
 	}
 

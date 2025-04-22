@@ -5,9 +5,9 @@ import (
 	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
-	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 
 	"strconv"
@@ -36,13 +36,6 @@ func NewNewsHandler(
 	}
 }
 
-type ImageDataResponse struct {
-	ImagePath string `json:"ImagePath"`
-	ImageName string `json:"imageName"`
-	Width     int    `json:"width"`
-	Height    int    `json:"height"`
-}
-
 // CreateNews godoc
 // @Summary Create a New News
 // @Description api สร้างหน้าข่าวใหม่
@@ -57,21 +50,24 @@ type ImageDataResponse struct {
 // @Router /news [post]
 func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 
-	title := c.FormValue("title")
-	detail := c.FormValue("detail")
-	statusStr := c.FormValue("status")
-	contentStatus := c.FormValue("content_status")
-	categoryID := c.FormValue("category")
-	tag := c.FormValue("tag")
+	var input domain.NewsRequest
 
-	if !utils.IsValidContentStatus(contentStatus) {
-		log.Printf("Invalid content status received: %s", contentStatus)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Content Status"})
+	if err := c.BodyParser(&input); err != nil {
+		log.Printf("news bad request %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrResponse{
+			Error: "Invalid News Reuquest",
+		})
 	}
 
-	status := statusStr == "true"
+	if err := utils.ValidateNewsInput(&input); err != nil {
+		log.Printf("news bad validator request %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrResponse{
+			Error: "Invalid Validator News Reuquest",
+		})
+	}
 
-	tagList := strings.Split(tag, ",")
+	status := input.Status == "true"
+	tagList := strings.Split(input.Tag, ",")
 
 	fileName, err := utils.UploadFile(c, "image", 5*1024*1024, "./upload/image")
 	if err != nil {
@@ -79,26 +75,23 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 	}
 
 	// ดึงไอดีของ cat มาเพื่อจะได้นำมาใส่ตอน create //
-	category, _ := h.CategoryService.GetByID(categoryID)
+	category, _ := h.CategoryService.GetByID(input.Category)
 
 	newNews := domain.News{
-		Title:         title,
-		Detail:        detail,
+		Title:         input.Title,
+		Detail:        input.Detail,
 		Image:         fileName,
 		CategoryID:    category,
 		Tag:           tagList,
 		Status:        status,
-		ContentStatus: contentStatus,
+		ContentStatus: input.ContentStatus,
+		ContentType:   input.ContentType,
 		CreatedAt:     time.Now().Format(time.RFC3339),
 		UpdatedAt:     time.Now().Format(time.RFC3339),
 	}
 
 	if err := h.service.Create(&newNews); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-	}
-
-	if err := h.cacheService.DeletePattern(context.Background(), "News_Keys_*"); err != nil {
-		log.Printf("Error deleting cache key: %v", err)
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(newNews)
@@ -162,29 +155,66 @@ func (h *NewsHandler) GetNewsByID(c *fiber.Ctx) error {
 }
 
 func (h *NewsHandler) GetNewsByCategory(c *fiber.Ctx) error {
+	categoryID := c.Params("id")
+	lastID := c.Query("lastID") // ปรับจาก Params → Query parameter
 
-	CategoryID := c.Params("id")
-
-	fmt.Println(CategoryID)
-
-	newsList, err := h.service.GetNewsByCategory(CategoryID)
+	newsResult, nextCursor, err := h.service.GetNewsByCategory(categoryID, lastID)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("GetNewsByCategory:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Internal Server Error",
+			"message": "Cannot Fetch News By Category",
 		})
 	}
 
-	if len(newsList) == 0 {
-		fmt.Println("No news found for CategoryID:", CategoryID)
+	if len(newsResult) == 0 {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"category": "",
+			"news":     []domain.NewsHomePageResponse{},
+			"next":     "",
+		})
 	}
 
-	// instance ดึงตัว name category เพื่อนำไปแสดงใน response //
-	categoryName := newsList[0].CategoryID.Name
+	var lastedNews []domain.NewsHomePageResponse
+	for _, news := range newsResult {
+		lastedNews = append(lastedNews, domain.NewsHomePageResponse{
+			Title:     news.Title,
+			Detail:    news.Detail,
+			Image:     news.Image,
+			Category:  news.CategoryID.Name,
+			CreatedAt: news.CreatedAt,
+		})
+	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"category": categoryName,
-		"news":     newsList,
+		"category": newsResult[0].CategoryID.Name,
+		"news":     lastedNews,
+		"next":     nextCursor,
+	})
+}
+
+func (h *NewsHandler) GetLastNews(c *fiber.Ctx) error {
+
+	lastNews, err := h.service.GetLastNews()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "cannot fecth category data",
+		})
+	}
+
+	var lastedNews []domain.HomePageLastedNewResponse
+	for _, news := range lastNews {
+		lastedNews = append(lastedNews, domain.HomePageLastedNewResponse{
+			Title:     news.Title,
+			Detail:    news.Detail,
+			Image:     news.Image,
+			Category:  news.CategoryID.Name,
+			CreatedAt: news.CreatedAt,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "ข่าวล่าสุด",
+		"data":    lastedNews,
 	})
 }
 
@@ -198,73 +228,40 @@ func (h *NewsHandler) UpdateNews(c *fiber.Ctx) error {
 		})
 	}
 
-	// ดึงข่าวมาเปรียบเทียบ //
-	existingNews, err := h.service.GetNewsByID(id)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to retrieve the news. Please try again later.",
+	var news domain.UpdateNewsRequestResponse
+	if err := c.BodyParser(&news); err != nil {
+		log.Printf("news bad request %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrResponse{
+			Error: "Invalid News Reuquest",
 		})
 	}
-	oldImg := existingNews.Image
 
-	title := c.FormValue("title")
-	detail := c.FormValue("detail")
-	statusStr := c.FormValue("status")
-	contentStatus := c.FormValue("content_status")
-	categoryID := c.FormValue("category")
-	tag := c.FormValue("tag")
-
-	if !utils.IsValidContentStatus(contentStatus) {
-		log.Printf("Invalid content status: %s", contentStatus)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Content Status"})
+	fileName, err := utils.UploadFile(c, "image", 5*1024*1024, "./upload/image")
+	if err != nil && err != http.ErrMissingFile {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	status := statusStr == "true"
-	tagList := strings.Split(tag, ",")
-
-	newfile := oldImg
-	if file, err := c.FormFile("image"); err == nil && file != nil {
-		newfile, err = utils.UploadFile(c, "image", 5*1024*1024, "./upload/image")
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
-		}
-	}
-
-	if categoryID != "" {
-		category, err := h.CategoryService.GetByID(categoryID)
-		if err != nil {
-			log.Println(err)
-			return c.Status(fiber.StatusInternalServerError).JSON(domain.ErrResponse{
-				Error: "Failed to retrieve category",
-			})
-		}
-		existingNews.CategoryID = category
-	}
-
-	if title != "" {
-		existingNews.Title = title
-	}
-	if detail != "" {
-		existingNews.Detail = detail
-	}
-	if tag != "" {
-		existingNews.Tag = tagList
-	}
-
-	existingNews.Status = status
-	existingNews.ContentStatus = contentStatus
-	existingNews.Image = newfile
-	existingNews.UpdatedAt = time.Now().Format(time.RFC3339)
-
-	if err := h.service.UpdateNews(id, existingNews); err != nil {
+	if err := h.service.UpdateNews(id, &news, fileName); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Cannot Update News cause Internal Server Error ",
 		})
 	}
 
+	newNews := domain.UpdateNewsRequestResponse{
+		Title:         news.Title,
+		Detail:        news.Detail,
+		Image:         fileName,
+		Category:      news.Category,
+		Tag:           news.Tag,
+		Status:        news.Status,
+		ContentStatus: news.ContentStatus,
+		ContentType:   news.ContentType,
+		UpdatedAt:     time.Now().Format(time.RFC3339),
+	}
+
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "News Updated Successfully",
-		"data":    existingNews,
+		"data":    newNews,
 	})
 }
 

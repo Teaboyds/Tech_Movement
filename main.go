@@ -13,8 +13,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-
-	"github.com/redis/go-redis/v9"
 )
 
 func Init(config *config.Container) {
@@ -34,12 +32,12 @@ func Init(config *config.Container) {
 	defer db.Close(ctx)
 
 	// connect redis //
-	redisOptions := &redis.Options{
-		Addr:     config.Redis.REDIS_PORT,
-		Password: config.Redis.REDIS_PASSWORD,
-		DB:       config.Redis.REDIS_DB,
-	}
-	redisClient := redis.NewClient(redisOptions)
+	// redisOptions := &redis.Options{
+	// 	Addr:     config.Redis.REDIS_PORT,
+	// 	Password: config.Redis.REDIS_PASSWORD,
+	// 	DB:       config.Redis.REDIS_DB,
+	// }
+	// redisClient := redis.NewClient(redisOptions)
 	cacheClient, err := cache.ConnectedRedis(ctx, config.Redis)
 	if err != nil {
 		slog.Error("Error initializing cache connection", "error", err)
@@ -52,8 +50,12 @@ func Init(config *config.Container) {
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 
 	// News //
-	newsRepo := repository.NewNewsRepo(db, redisClient)
-	newService := service.NewsService(newsRepo, categoryRepo)
+	newsRepo := repository.NewNewsRepo(db)
+	if err := newsRepo.EnsureIndexs(); err != nil {
+		slog.Error("Error ensuring news indexes", "error", err)
+		os.Exit(1)
+	}
+	newService := service.NewsService(newsRepo, categoryRepo, cacheClient)
 	newHandler := handler.NewNewsHandler(newService, categoryRepo, cacheClient)
 
 	// run server from server.go //

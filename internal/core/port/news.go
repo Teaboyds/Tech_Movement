@@ -8,7 +8,8 @@ type NewsRepository interface {
 	Create(news *d.News) error
 	GetNewsPagination(lastID string, limit int) ([]d.News, error)
 	GetNewsByID(id string) (*d.News, error)
-	GetNewsByCategory(CategoryId string) ([]d.News, error)
+	GetNewsByCategory(categoryID string, lastID string) ([]d.News, string, error)
+	GetLastNews() ([]d.News, error)
 	GetNewsByTags(name string) ([]d.News, error)
 	UpdateNews(id string, news *d.News) error
 	Delete(id string) error
@@ -19,8 +20,8 @@ type NewsService interface {
 	Create(news *d.News) error
 	GetNewsPagination(lastID string, limit int) ([]d.News, error)
 	GetNewsByID(id string) (*d.News, error)
-	GetNewsByCategory(CategoryId string) ([]d.News, error)
-	GetNewsByTags(name string) ([]d.News, error)
-	UpdateNews(id string, news *d.News) error
+	GetNewsByCategory(categoryID string, lastID string) ([]d.News, string, error)
+	GetLastNews() ([]d.News, error)
+	UpdateNews(id string, req *d.UpdateNewsRequestResponse, filename string) error
 	Delete(id string) error
 }

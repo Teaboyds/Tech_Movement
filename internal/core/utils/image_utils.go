@@ -11,12 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 )
-
-func GenerateUUID() string {
-	return uuid.New().String()
-}
 
 func DeleteImageFiles(fileName string) {
 	if fileName == "" {
@@ -61,7 +56,6 @@ func UploadFile(c *fiber.Ctx, fieldName string, maxSize int64, uploadDir string)
 	hashString := hex.EncodeToString(hash.Sum(nil))
 	fileName := hashString + fileEXT
 
-	// ตรวจสอบว่ามีไฟล์นี้อยู่แล้วไหม (ถ้ามีไม่ต้องเซฟซ้ำ)
 	savePath := filepath.Join(uploadDir, fileName)
 	if _, err := os.Stat(savePath); os.IsNotExist(err) {
 

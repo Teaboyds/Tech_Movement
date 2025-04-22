@@ -1,19 +1,46 @@
-{
-    "data": {
-        "id": "67ff2fad1b0f8908256063ba",
-        "title": "MooDeng News",
-        "detail": "Details MooDeng",
-        "image": "http://localhost:5050/upload/image140df2a2-1928-4e83-acb6-71bdc147e161.jpg",
-        "category": {
-            "id": "67ee241e8cf5721ad13e4293",
-            "name": "Uncategorized"
-        },
-        "tag": [
-            "ข่าวสดร้อน",
-            "มาแรง 2025"
+[   
+    {
+        "name": "Home Page Mock Json",
+        "version": "1"
+    },
+    {
+        "data": [
+            {
+                "title": "Mooo Deng News ",
+                "detail": "Details Deng Deng",
+                "image": "http://localhost:5050/upload/image/57c4182471cc2e9b3cf7db7061d15e21.jpg",
+                "category": "หมูเด้ง",
+                "created_at": "2025-04-22T13:48:38+07:00"
+            },
+            {
+                "title": "Pra Teen News ",
+                "detail": "Details Bae Bae",
+                "image": "http://localhost:5050/upload/image/62b976307ce61c47ca1fc4d670c9fd55.jpg",
+                "category": "หมูเด้ง",
+                "created_at": "2025-04-22T13:47:42+07:00"
+            },
+            {
+                "title": "Noo Phee News ",
+                "detail": "Details Jeed Jeed",
+                "image": "http://localhost:5050/upload/image/9bca8016a060fcbf938469b84b71d2ab.jpg",
+                "category": "หมูเด้ง",
+                "created_at": "2025-04-22T13:41:52+07:00"
+            },
+            {
+                "title": "High Yee Na News ",
+                "detail": "Details Boo Booo",
+                "image": "http://localhost:5050/upload/image/87a6c42e5ee64c67d6724ea6191e1abb.jpg",
+                "category": "หมูเด้ง",
+                "created_at": "2025-04-22T13:41:05+07:00"
+            },
+            {
+                "title": "Jiag Jiag News ",
+                "detail": "Details Jiag Jiag",
+                "image": "http://localhost:5050/upload/image/65cd3b6c4f1427d471c251edfd3ff127.jpg",
+                "category": "หมูเด้ง",
+                "created_at": "2025-04-22T10:17:58+07:00"
+            }
         ],
-        "status": true,
-        "created_at": "2025-04-16 11:18:53.68",
-        "updated_at": "2025-04-16 11:18:53.68"
+        "message": "ข่าวล่าสุด"
     }
-}
+]

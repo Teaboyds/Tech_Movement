@@ -12,31 +12,31 @@ import (
 )
 
 type Redis struct {
-	MongoClient *redis.Client
+	RedisClient *redis.Client
 }
 
 func ConnectedRedis(ctx context.Context, config *config.Redis) (port.CacheRepository, error) {
-	MongoClient := redis.NewClient(&redis.Options{
+	RedisClient := redis.NewClient(&redis.Options{
 		Addr:     config.REDIS_PORT,
 		Password: config.REDIS_PASSWORD,
 		DB:       config.REDIS_DB,
 	})
-	_, err := MongoClient.Ping(ctx).Result()
+	_, err := RedisClient.Ping(ctx).Result()
 	if err != nil {
 		log.Fatal("Cannot connect to Redis: ", err)
 	}
 	log.Println("Connected to Redis")
-	return &Redis{MongoClient}, nil
+	return &Redis{RedisClient}, nil
 }
 
 func (r *Redis) Set(ctx context.Context, key string, value interface{}, timeout time.Duration) error {
 
-	// แปลง value เพื่อเก็บใน redis เพราะ ฝ //
+	// แปลง value เพื่อเก็บใน redis  //
 	j, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	if _, err = r.MongoClient.Set(ctx, key, j, timeout).Result(); err != nil {
+	if _, err = r.RedisClient.Set(ctx, key, j, timeout).Result(); err != nil {
 		return err
 	}
 	return nil
@@ -45,7 +45,7 @@ func (r *Redis) Set(ctx context.Context, key string, value interface{}, timeout 
 func (r *Redis) Get(ctx context.Context, key string, value interface{}) error {
 
 	// ดึง keys มาแล้วแปลงเป็น byte //
-	b, err := r.MongoClient.Get(ctx, key).Bytes()
+	b, err := r.RedisClient.Get(ctx, key).Bytes()
 	if err != nil {
 		return err
 	}
@@ -61,15 +61,24 @@ func (r *Redis) Get(ctx context.Context, key string, value interface{}) error {
 }
 
 func (r *Redis) Delete(ctx context.Context, key string) error {
-	return r.MongoClient.Del(ctx, key).Err()
+	return r.RedisClient.Del(ctx, key).Err()
 }
 
 func (r *Redis) DeletePattern(ctx context.Context, key string) error {
-	keys, err := r.MongoClient.Keys(ctx, key).Result()
+	keys, err := r.RedisClient.Keys(ctx, key).Result()
 	if err != nil {
 		return err
 	}
-	return r.MongoClient.Del(ctx, keys...).Err()
+	return r.RedisClient.Del(ctx, keys...).Err()
+}
+
+func (r *Redis) IncrementVersion(ctx context.Context, key string) (int64, error) {
+	val, err := r.RedisClient.Incr(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+
+	return val, nil
 }
 
 func (r *Redis) IsKeyNotFound(err error) bool {
