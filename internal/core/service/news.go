@@ -1,7 +1,6 @@
 package service
 
 import (
-	"backend_tech_movement_hex/internal/adapter/storage/mongodb/repository"
 	d "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
@@ -9,15 +8,17 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type NewsServiceImpl struct {
-	repo         *repository.MongoNewsRepository
+	repo         port.NewsRepository
 	categoryRepo port.CategoryRepository
 	cache        port.CacheRepository
 }
 
-func NewsService(repo *repository.MongoNewsRepository, categoryRepo port.CategoryRepository, cache port.CacheRepository) port.NewsService {
+func NewsService(repo port.NewsRepository, categoryRepo port.CategoryRepository, cache port.CacheRepository) port.NewsService {
 	return &NewsServiceImpl{
 		repo:         repo,
 		categoryRepo: categoryRepo,
@@ -26,6 +27,8 @@ func NewsService(repo *repository.MongoNewsRepository, categoryRepo port.Categor
 }
 
 func (n *NewsServiceImpl) Create(news *d.News) error {
+
+	ctx := context.Background()
 
 	// ถ้าไม่มี input เข้ามาเป็น cat id  ให้ default เป็น Uncategorized || *fallback value* //
 	if news.CategoryID == nil {
@@ -44,7 +47,25 @@ func (n *NewsServiceImpl) Create(news *d.News) error {
 		}
 	}
 
-	return n.repo.Create(news)
+	err := n.repo.Create(news)
+	if err != nil {
+		return err
+	}
+
+	cachePrefix := "news:latest:data:"
+	cacheKey := cachePrefix + "latest"
+	err = n.cache.Delete(ctx, cacheKey)
+	if err != nil {
+		return err
+	}
+
+	newsCatKeys := "news:category:" + news.CategoryID.ID.String()
+	err = n.cache.Delete(ctx, newsCatKeys)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // / Get area ///
@@ -79,22 +100,13 @@ func (n *NewsServiceImpl) GetNewsByCategory(categoryID string, lastID string) ([
 }
 
 func (n *NewsServiceImpl) GetLastNews() ([]d.News, error) {
-
 	ctx := context.Background()
 
-	versionKey := "news:latest:version"
 	cachePrefix := "news:latest:data:"
-
-	var version string
-	err := n.cache.Get(ctx, versionKey, &version)
-	if err != nil || version == "" {
-		version = "v1"
-	}
-
-	cacheKey := cachePrefix + version
+	cacheKey := cachePrefix + "latest"
 
 	var cacheNews []d.News
-	err = n.cache.Get(ctx, cacheKey, &cacheNews)
+	err := n.cache.Get(ctx, cacheKey, &cacheNews)
 	if err == nil && len(cacheNews) > 0 {
 		log.Println("Cache Hit:", cacheKey)
 		return cacheNews, nil
@@ -111,12 +123,74 @@ func (n *NewsServiceImpl) GetLastNews() ([]d.News, error) {
 		utils.AttachBaseURLToImage(&news[i])
 	}
 
-	_ = n.cache.Set(ctx, cacheKey, news, 3*time.Minute)
+	ttl := 10 * time.Minute
+	err = n.cache.Set(ctx, cacheKey, news, ttl)
+	if err != nil {
+		log.Printf("Error setting cache for %v: %v", cacheKey, err)
+		return nil, err
+	}
 
 	return news, nil
 }
 
-/// Get area ///
+func (n *NewsServiceImpl) GetNewsByCategoryHomePage(categoryID string) ([]d.News, error) {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	ObjID, err := primitive.ObjectIDFromHex(categoryID)
+	if err != nil {
+		log.Println("Invalid category ID:", err)
+		return nil, fmt.Errorf("invalid category ID format")
+	}
+
+	cacheKey := "news:category:" + ObjID.String()
+	fmt.Printf("cacheKey: %v\n", cacheKey)
+
+	var cacheNewsCategory []d.News
+	err = n.cache.Get(ctx, cacheKey, &cacheNewsCategory)
+	if err == nil && len(cacheNewsCategory) > 0 {
+		log.Println("Cache Hit:", cacheKey)
+		return cacheNewsCategory, nil
+	}
+
+	log.Println("Cache Miss:", cacheKey)
+
+	news, err := n.repo.GetNewsByCategoryHomePage(categoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range news {
+		utils.AttachBaseURLToImage(&news[i])
+		news[i].CreatedAtText = utils.ConvertTimeResponse(news[i].CreatedAt)
+	}
+
+	err = n.cache.Set(ctx, cacheKey, news, 5*time.Minute)
+	if err != nil {
+		log.Printf("Error setting cache for category %s: %v", cacheKey, err)
+		return nil, err
+	}
+
+	return news, nil
+}
+
+func (n *NewsServiceImpl) GetNewsByWeek() ([]d.News, error) {
+
+	news, err := n.repo.GetNewsByWeek()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range news {
+		utils.AttachBaseURLToImage(&news[i])
+		news[i].CreatedAtText = utils.ConvertTimeResponse(news[i].CreatedAt)
+	}
+
+	return news, nil
+}
+
+/// Get area ///_
 
 func (n *NewsServiceImpl) UpdateNews(id string, req *d.UpdateNewsRequestResponse, filename string) error {
 
@@ -131,6 +205,10 @@ func (n *NewsServiceImpl) UpdateNews(id string, req *d.UpdateNewsRequestResponse
 
 	if req.Title != "" {
 		existingNews.Title = req.Title
+	}
+
+	if req.Abstract != "" {
+		existingNews.Abstract = req.Abstract
 	}
 
 	if req.Detail != "" {

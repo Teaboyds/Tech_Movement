@@ -2,12 +2,15 @@
 package domain
 
 import (
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type News struct {
 	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Title         string             `bson:"title" json:"title"`
+	Abstract      string             `bson:"abstract" json:"abstract"`
 	Detail        string             `bson:"detail" json:"detail"`
 	Image         string             `bson:"image" json:"image"`
 	CategoryID    *Category          `bson:"category_id" json:"category"`
@@ -15,14 +18,16 @@ type News struct {
 	Status        bool               `bson:"status" json:"status"`
 	ContentStatus string             `bson:"content_status" json:"content_status"` /* enum draft || publised || archived */
 	ContentType   string             `bson:"content_type" json:"content_type"`     /* enum general || breaking || video */
-	CreatedAt     string             `bson:"created_at" json:"created_at"`
-	UpdatedAt     string             `bson:"updated_at" json:"updated_at"`
+	CreatedAt     time.Time          `bson:"created_at" json:"created_at"`
+	CreatedAtText string             `bson:"-" json:"created_at_text"`
+	UpdatedAt     time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
 ////////////////////////////////// Response // Request // Models /////////////////////////////////////////////////
 
 type NewsRequest struct {
 	Title         string `json:"title" validate:"required"`
+	Abstract      string `json:"abstract" validate:"required"`
 	Detail        string `json:"detail" validate:"required"`
 	Image         string `json:"image"`
 	Category      string `json:"category"`
@@ -34,6 +39,7 @@ type NewsRequest struct {
 
 type UpdateNewsRequestResponse struct {
 	Title         string `json:"title"`
+	Abstract      string `json:"abstract"`
 	Detail        string `json:"detail"`
 	Image         string `json:"image"`
 	Category      string `json:"category"`
@@ -46,6 +52,15 @@ type UpdateNewsRequestResponse struct {
 
 // News Home::LastedNews//
 type HomePageLastedNewResponse struct {
+	Title         string    `json:"title"`
+	Detail        string    `json:"detail"`
+	Image         string    `json:"image"`
+	Category      string    `json:"category"`
+	CreatedAt     time.Time `json:"created_at"`
+	CreatedAtText string    `json:"created_at_text"`
+}
+
+type HomePageWeekNewsResponse struct {
 	Title     string `json:"title"`
 	Detail    string `json:"detail"`
 	Image     string `json:"image"`
@@ -54,8 +69,9 @@ type HomePageLastedNewResponse struct {
 }
 
 // News Home::Technology//
-type NewsHomePageResponse struct {
+type NewsHomeCategoryPageResponse struct {
 	Title     string `json:"title"`
+	Abstract  string `json:"abstract"`
 	Detail    string `json:"detail"`
 	Image     string `json:"image"`
 	Category  string `json:"category"`

@@ -36,18 +36,6 @@ func NewNewsHandler(
 	}
 }
 
-// CreateNews godoc
-// @Summary Create a New News
-// @Description api สร้างหน้าข่าวใหม่
-// @Tags news
-// @Accept json
-// @Produce json
-// @Security ApiKeyAuth
-// @Param news body domain.News true "News Data"
-// @Success 201 {object} domain.News
-// @Failure 404 {object} domain.ErrResponse
-// @Failure 500 {object} domain.ErrResponse
-// @Router /news [post]
 func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 
 	var input domain.NewsRequest
@@ -69,7 +57,7 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 	status := input.Status == "true"
 	tagList := strings.Split(input.Tag, ",")
 
-	fileName, err := utils.UploadFile(c, "image", 5*1024*1024, "./upload/image")
+	fileName, err := utils.UploadFile(c, "image", 5*1024*1024, "./upload/news_image")
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
 	}
@@ -80,14 +68,15 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 	newNews := domain.News{
 		Title:         input.Title,
 		Detail:        input.Detail,
+		Abstract:      input.Abstract,
 		Image:         fileName,
 		CategoryID:    category,
 		Tag:           tagList,
 		Status:        status,
 		ContentStatus: input.ContentStatus,
 		ContentType:   input.ContentType,
-		CreatedAt:     time.Now().Format(time.RFC3339),
-		UpdatedAt:     time.Now().Format(time.RFC3339),
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	if err := h.service.Create(&newNews); err != nil {
@@ -97,19 +86,6 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(newNews)
 }
 
-// GetNewsByPage godoc
-// @Summary Get News Pagination
-// @Description ดึงข้อมูลข่าวแบบ pagination โดยดึงจาก lastid กล่าวคือหากใส่ id ของข่าวแล้วหลังจาก id ลงไปนั้นตาม limit
-// @Tags news
-// @Accept json
-// @Produce json
-// @Security ApiKeyAuth
-// @Param lastID query string false "ID of the last news item from the previous page"
-// @Param limit query int false "Number of news per page (default: 10)"
-// @Success 200 {object} domain.News
-// @Failure 400 {object} domain.ErrResponse "Invalid request parameters"
-// @Failure 500 {object} domain.ErrResponse "Cannot Fetch Data."
-// @Router /news [get]
 func (h *NewsHandler) GetNewsByPage(c *fiber.Ctx) error {
 
 	lastID := c.Query("lastID")
@@ -154,7 +130,7 @@ func (h *NewsHandler) GetNewsByID(c *fiber.Ctx) error {
 	})
 }
 
-func (h *NewsHandler) GetNewsByCategory(c *fiber.Ctx) error {
+func (h *NewsHandler) GetNewsByCategoryPagi(c *fiber.Ctx) error {
 	categoryID := c.Params("id")
 	lastID := c.Query("lastID") // ปรับจาก Params → Query parameter
 
@@ -169,19 +145,20 @@ func (h *NewsHandler) GetNewsByCategory(c *fiber.Ctx) error {
 	if len(newsResult) == 0 {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"category": "",
-			"news":     []domain.NewsHomePageResponse{},
+			"news":     []domain.NewsHomeCategoryPageResponse{},
 			"next":     "",
 		})
 	}
 
-	var lastedNews []domain.NewsHomePageResponse
+	var lastedNews []domain.NewsHomeCategoryPageResponse
 	for _, news := range newsResult {
-		lastedNews = append(lastedNews, domain.NewsHomePageResponse{
+		lastedNews = append(lastedNews, domain.NewsHomeCategoryPageResponse{
 			Title:     news.Title,
+			Abstract:  news.Abstract,
 			Detail:    news.Detail,
 			Image:     news.Image,
 			Category:  news.CategoryID.Name,
-			CreatedAt: news.CreatedAt,
+			CreatedAt: news.CreatedAtText,
 		})
 	}
 
@@ -197,7 +174,7 @@ func (h *NewsHandler) GetLastNews(c *fiber.Ctx) error {
 	lastNews, err := h.service.GetLastNews()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "cannot fecth category data",
+			"message": "cannot fecth lastNews data",
 		})
 	}
 
@@ -209,6 +186,61 @@ func (h *NewsHandler) GetLastNews(c *fiber.Ctx) error {
 			Image:     news.Image,
 			Category:  news.CategoryID.Name,
 			CreatedAt: news.CreatedAt,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "ข่าวล่าสุด",
+		"data":    lastedNews,
+	})
+}
+
+func (h *NewsHandler) GetNewsWeeks(c *fiber.Ctx) error {
+
+	weekNews, err := h.service.GetNewsByWeek()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "cannot fecth weekNews data",
+		})
+	}
+
+	var news []domain.HomePageWeekNewsResponse
+	for _, wkN := range weekNews {
+		news = append(news, domain.HomePageWeekNewsResponse{
+			Title:     wkN.Title,
+			Detail:    wkN.Detail,
+			Image:     wkN.Image,
+			Category:  wkN.CategoryID.Name,
+			CreatedAt: wkN.CreatedAtText,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "ข่าวเด่นประจำสัปดาห์",
+		"data":    news,
+	})
+}
+
+func (h *NewsHandler) GetNewsByCategory(c *fiber.Ctx) error {
+
+	id := c.Query("id", "")
+
+	newsCat, err := h.service.GetNewsByCategoryHomePage(id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "cannot fecth category data",
+		})
+	}
+
+	var lastedNews []domain.NewsHomeCategoryPageResponse
+	for _, news := range newsCat {
+		lastedNews = append(lastedNews, domain.NewsHomeCategoryPageResponse{
+			Title:     news.Title,
+			Abstract:  news.Abstract,
+			Detail:    news.Detail,
+			Image:     news.Image,
+			Category:  news.CategoryID.Name,
+			CreatedAt: news.CreatedAtText,
 		})
 	}
 
@@ -236,12 +268,13 @@ func (h *NewsHandler) UpdateNews(c *fiber.Ctx) error {
 		})
 	}
 
-	fileName, err := utils.UploadFile(c, "image", 5*1024*1024, "./upload/image")
+	fileName, err := utils.UploadFile(c, "image", 5*1024*1024, "./upload/news_image")
 	if err != nil && err != http.ErrMissingFile {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	if err := h.service.UpdateNews(id, &news, fileName); err != nil {
+		fmt.Printf("err: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Cannot Update News cause Internal Server Error ",
 		})
@@ -249,6 +282,7 @@ func (h *NewsHandler) UpdateNews(c *fiber.Ctx) error {
 
 	newNews := domain.UpdateNewsRequestResponse{
 		Title:         news.Title,
+		Abstract:      news.Abstract,
 		Detail:        news.Detail,
 		Image:         fileName,
 		Category:      news.Category,

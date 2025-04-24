@@ -51,18 +51,27 @@ func Init(config *config.Container) {
 
 	// News //
 	newsRepo := repository.NewNewsRepo(db)
-	if err := newsRepo.EnsureIndexs(); err != nil {
+	if err := newsRepo.EnsureNewsIndexs(); err != nil {
 		slog.Error("Error ensuring news indexes", "error", err)
 		os.Exit(1)
 	}
 	newService := service.NewsService(newsRepo, categoryRepo, cacheClient)
 	newHandler := handler.NewNewsHandler(newService, categoryRepo, cacheClient)
 
+	mediaRepo := repository.NewMediaRepo(db)
+	if err := mediaRepo.EnsureMediaIndexs(); err != nil {
+		slog.Error("Error ensuring news indexes", "error", err)
+		os.Exit(1)
+	}
+	mediaService := service.NewMediaService(mediaRepo)
+	mediaHandler := handler.NewMediaHandler(mediaService, categoryService)
+
 	// run server from server.go //
 	router, err := handler.SetUpRoutes(handler.RouterParams{
 		Config:          config.HTTP,
 		NewsHandler:     *newHandler,
 		CategoryHandler: *categoryHandler,
+		MediaHandler:    *mediaHandler,
 	})
 	if err != nil {
 		logger.Error("Error initializing router" + "error" + err.Error())

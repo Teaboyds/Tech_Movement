@@ -10,7 +10,7 @@ type CategoryService struct {
 	CatRepo port.CategoryRepository
 }
 
-func NewCategoryService(CatRepo port.CategoryRepository) *CategoryService {
+func NewCategoryService(CatRepo port.CategoryRepository) port.CategoryService {
 	return &CategoryService{CatRepo: CatRepo}
 }
 

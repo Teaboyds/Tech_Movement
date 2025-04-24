@@ -27,7 +27,7 @@ func DeleteImageFiles(fileName string) {
 }
 
 func UploadFile(c *fiber.Ctx, fieldName string, maxSize int64, uploadDir string) (string, error) {
-	// รับไฟล์จากฟอร์ม
+
 	fileHeader, err := c.FormFile(fieldName)
 	if err != nil {
 		log.Println("Error receiving file:", err)
@@ -86,4 +86,9 @@ func UploadFile(c *fiber.Ctx, fieldName string, maxSize int64, uploadDir string)
 func AttachBaseURLToImage(new *domain.News) {
 	baseURL := os.Getenv("BASE_URL")
 	new.Image = baseURL + new.Image
+}
+
+func AttachBaseURLToMediaImg(media *domain.Media) {
+	baseURL := os.Getenv("BASE_URL_MEDIA")
+	media.Image = baseURL + media.Image
 }

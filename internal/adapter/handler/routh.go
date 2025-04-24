@@ -19,6 +19,7 @@ type RouterParams struct {
 	Config          *config.HTTP
 	NewsHandler     NewsHandler
 	CategoryHandler CategoryHandler
+	MediaHandler    MediaHandler
 }
 
 func SetUpRoutes(p RouterParams) (*Router, error) {
@@ -26,7 +27,8 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 	app := fiber.New()
 
 	app.Get("/swagger/*", swagger.HandlerDefault)
-	app.Static("/upload/image", "./upload/image")
+	app.Static("/upload/news_image", "./upload/news_image")
+	app.Static("/upload/media_image", "./upload/media_image")
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     p.Config.HttpOrigins,
 		AllowHeaders:     "Origin, Content-Type, Accept",
@@ -57,10 +59,17 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			category.Delete("/:id", p.CategoryHandler.DeleteCategory)
 		}
 
+		media := v1.Group("/media")
+		{
+			media.Post("/", p.MediaHandler.CreateMedia)
+		}
+
 		home := v1.Group("/home")
 		{
 			home.Get("/lastedNews", p.NewsHandler.GetLastNews)
-			home.Get("/techNews/:id", p.NewsHandler.GetNewsByCategory)
+			home.Get("/techNews", p.NewsHandler.GetNewsByCategory)
+			home.Get("/weekNews", p.NewsHandler.GetNewsWeeks)
+			home.Get("/videoMedia", p.MediaHandler.GetMediaHome)
 		}
 
 	}

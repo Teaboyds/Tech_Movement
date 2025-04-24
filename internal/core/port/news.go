@@ -10,10 +10,13 @@ type NewsRepository interface {
 	GetNewsByID(id string) (*d.News, error)
 	GetNewsByCategory(categoryID string, lastID string) ([]d.News, string, error)
 	GetLastNews() ([]d.News, error)
-	GetNewsByTags(name string) ([]d.News, error)
+	GetNewsByWeek() ([]d.News, error)
+	GetNewsByCategoryHomePage(categoryID string) ([]d.News, error)
+	// GetNewsByTags(name string) ([]d.News, error)
 	UpdateNews(id string, news *d.News) error
 	Delete(id string) error
 	DeleteImg(path string) error
+	EnsureNewsIndexs() error
 }
 
 type NewsService interface {
@@ -22,6 +25,8 @@ type NewsService interface {
 	GetNewsByID(id string) (*d.News, error)
 	GetNewsByCategory(categoryID string, lastID string) ([]d.News, string, error)
 	GetLastNews() ([]d.News, error)
+	GetNewsByWeek() ([]d.News, error)
+	GetNewsByCategoryHomePage(categoryID string) ([]d.News, error)
 	UpdateNews(id string, req *d.UpdateNewsRequestResponse, filename string) error
 	Delete(id string) error
 }

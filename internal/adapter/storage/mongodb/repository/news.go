@@ -4,11 +4,13 @@ package repository
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	d "backend_tech_movement_hex/internal/core/domain"
+	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -20,14 +22,12 @@ type MongoNewsRepository struct {
 	collection *mongo.Collection
 }
 
-func NewNewsRepo(db *mongodb.Database) *MongoNewsRepository {
-	return &MongoNewsRepository{
-		collection: db.Collection("news"),
-	}
+func NewNewsRepo(db *mongodb.Database) port.NewsRepository {
+	return &MongoNewsRepository{collection: db.Collection("news")}
 }
 
 // // index model ////
-func (n *MongoNewsRepository) EnsureIndexs() error {
+func (n *MongoNewsRepository) EnsureNewsIndexs() error {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
@@ -47,6 +47,7 @@ func (n *MongoNewsRepository) EnsureIndexs() error {
 	return err
 }
 
+// /// create area ///
 func (n *MongoNewsRepository) Create(news *d.News) error {
 
 	ctx, cancel := utils.NewTimeoutContext()
@@ -58,7 +59,7 @@ func (n *MongoNewsRepository) Create(news *d.News) error {
 	return err
 }
 
-///// Get Area ////
+// /// get area ///
 
 func (n *MongoNewsRepository) GetNewsPagination(lastID string, limit int) ([]d.News, error) {
 
@@ -210,7 +211,100 @@ func (n *MongoNewsRepository) GetLastNews() ([]d.News, error) {
 	return lastNews, nil
 }
 
-///// Get Area ////
+func (n *MongoNewsRepository) GetNewsByCategoryHomePage(categoryID string) ([]d.News, error) {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	var newsCategory []d.News
+
+	filter := bson.M{
+		"status":         true,
+		"content_status": "published",
+		"content_type":   "general",
+	}
+
+	if categoryID != "" {
+		objID, err := primitive.ObjectIDFromHex(categoryID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid CategoryID: %v", err)
+		}
+		filter["category_id._id"] = objID
+	}
+
+	findOptions := options.Find().
+		SetProjection(bson.M{
+			"_id":          0,
+			"tag":          0,
+			"status":       0,
+			"content_type": 0,
+			"updated_at":   0,
+		}).
+		SetLimit(9).
+		SetSort(bson.D{{Key: "_id", Value: -1}})
+
+	cursor, err := n.collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, fmt.Errorf("cannot fetching news: %v", err)
+	}
+	if cursor != nil {
+		defer cursor.Close(ctx)
+	}
+
+	if err := cursor.All(ctx, &newsCategory); err != nil {
+		return nil, fmt.Errorf("error decoding news: %v", err)
+	}
+
+	return newsCategory, nil
+}
+
+func (n *MongoNewsRepository) GetNewsByWeek() ([]d.News, error) {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	var weekNews []d.News
+
+	now := time.Now()
+	weekStart := now.AddDate(0, 0, -int(now.Weekday())+1) // Monday
+	if now.Weekday() == time.Sunday {
+		weekStart = now.AddDate(0, 0, -6) // Special case for Sunday
+	}
+	monday := weekStart.Truncate(24 * time.Hour)
+	fmt.Printf("monday: %v\n", monday)
+
+	findOptions := options.Find().
+		SetProjection(bson.M{"_id": 0, "tag": 0, "status": 0, "content_type": 0, "updated_at": 0}).
+		SetLimit(4).
+		SetSort(bson.D{{Key: "_id", Value: -1}})
+
+	filter := bson.M{
+		"status":         true,
+		"content_status": "published",
+		"content_type":   "general",
+		"created_at":     bson.M{"$gte": monday},
+	}
+
+	cursor, err := n.collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &weekNews); err != nil {
+		log.Printf("Error decoding repo last news: %v", err)
+		return nil, err
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return weekNews, nil
+
+}
+
+// /// get area ///
 
 func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
 	ctx, cancel := utils.NewTimeoutContext()
@@ -224,6 +318,7 @@ func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
 	update := bson.M{
 		"$set": bson.M{
 			"title":          news.Title,
+			"abstract":       news.Abstract,
 			"detail":         news.Detail,
 			"image":          news.Image,
 			"category_id":    news.CategoryID,
@@ -268,7 +363,7 @@ func (n *MongoNewsRepository) Delete(id string) error {
 }
 
 func (n *MongoNewsRepository) DeleteImg(path string) error {
-	fullPath := "./upload/image/" + path
+	fullPath := "./upload/news_image/" + path
 
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		log.Printf("Mongo : Image not found at: %s", fullPath)
@@ -277,30 +372,30 @@ func (n *MongoNewsRepository) DeleteImg(path string) error {
 
 	err := os.Remove(fullPath)
 	if err != nil {
-		log.Printf("❌ Failed to delete image at %s: %v", fullPath, err)
+		log.Printf(" Failed to delete image at %s: %v", fullPath, err)
 		return err
 	}
 
-	log.Printf("✅ Image deleted: %s", fullPath)
+	log.Printf("Image deleted: %s", fullPath)
 	return nil
 }
 
-func (n *MongoCategoryRepository) GetNewsByTags(name string) ([]d.News, error) {
+// func (n *MongoCategoryRepository) GetNewsByTags(name string) ([]d.News, error) {
 
-	var news []d.News
-	ctx, cancel := utils.NewTimeoutContext()
-	defer cancel()
+// 	var news []d.News
+// 	ctx, cancel := utils.NewTimeoutContext()
+// 	defer cancel()
 
-	filter := bson.M{"tags": name}
-	cursor, err := n.db.Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
+// 	filter := bson.M{"tags": name}
+// 	cursor, err := n.db.Find(ctx, filter)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer cursor.Close(ctx)
 
-	if err := cursor.All(ctx, &news); err != nil {
-		return nil, err
-	}
+// 	if err := cursor.All(ctx, &news); err != nil {
+// 		return nil, err
+// 	}
 
-	return news, nil
-}
+// 	return news, nil
+// }
