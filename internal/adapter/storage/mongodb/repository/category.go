@@ -2,11 +2,14 @@ package repository
 
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
+	"backend_tech_movement_hex/internal/adapter/storage/mongodb/models"
 	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
 	"context"
+	"fmt"
 	"log"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -22,21 +25,27 @@ func NewCategoryRepositoryMongo(db *mongodb.Database) port.CategoryRepository {
 	return &MongoCategoryRepository{db: db.Collection("categories")}
 }
 
-func (cat *MongoCategoryRepository) Create(category *domain.Category) error {
+func (cat *MongoCategoryRepository) Create(category *domain.CategoryRequest) error {
 
-	category.ID = primitive.NewObjectID()
-	_, err := cat.db.InsertOne(context.Background(), category)
+	cateDoc := &models.MongoCategory{
+		Name:         category.Name,
+		CategoryType: category.CategoryType,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	_, err := cat.db.InsertOne(context.Background(), cateDoc)
 	return err
 }
 
-func (cat *MongoCategoryRepository) GetByID(id string) (*domain.Category, error) {
+func (cat *MongoCategoryRepository) GetByID(id string) (*domain.CategoryResponse, error) {
 
 	ObjID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
 
-	var category domain.Category
+	var category models.MongoCategory
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
@@ -48,25 +57,81 @@ func (cat *MongoCategoryRepository) GetByID(id string) (*domain.Category, error)
 		return nil, err
 	}
 
-	return &category, nil
+	response := &domain.CategoryResponse{
+		ID:   category.ID.Hex(),
+		Name: category.Name,
+	}
+
+	return response, nil
 }
 
-func (cat *MongoCategoryRepository) GetByName(name string) (*domain.Category, error) {
-	var category domain.Category
-	err := cat.db.FindOne(context.Background(), bson.M{"name": name}).Decode(&category)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
+func (cat *MongoCategoryRepository) GetByIDs(ids []string) ([]*domain.CategoryResponse, error) {
+
+	objIDs := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
 			return nil, err
 		}
+		objIDs = append(objIDs, objID)
+	}
 
+	var categories []models.MongoCategory
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	filter := bson.M{
+		"_id": bson.M{"$in": objIDs},
+	}
+
+	cursor, err := cat.db.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &categories); err != nil {
 		return nil, err
 	}
 
-	return &category, nil
+	var responses []*domain.CategoryResponse
+	for _, category := range categories {
+		resp := &domain.CategoryResponse{
+			ID:   category.ID.Hex(),
+			Name: category.Name,
+		}
+		responses = append(responses, resp)
+	}
+
+	return responses, nil
 }
 
-func (cat *MongoCategoryRepository) GetAll() ([]domain.Category, error) {
-	var categories []domain.Category
+func (cat *MongoCategoryRepository) GetByName(name string) (*domain.Category, error) {
+
+	var category models.MongoCategory
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	err := cat.db.FindOne(ctx, bson.M{"name": name}).Decode(&category)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("category with name %s not found", name)
+		}
+		return nil, fmt.Errorf("failed to find category by name: %w", err)
+	}
+
+	resp := &domain.Category{
+		ID:   category.ID.Hex(),
+		Name: category.Name,
+	}
+
+	return resp, nil
+}
+
+func (cat *MongoCategoryRepository) GetAll() ([]domain.CategoryResponse, error) {
+	var categories []models.MongoCategory
 	cursor, err := cat.db.Find(context.Background(), bson.M{})
 	if err != nil {
 		return nil, err
@@ -74,7 +139,7 @@ func (cat *MongoCategoryRepository) GetAll() ([]domain.Category, error) {
 	defer cursor.Close(context.Background())
 
 	for cursor.Next(context.Background()) {
-		var category domain.Category
+		var category models.MongoCategory
 		if err := cursor.Decode(&category); err != nil {
 			log.Println("Error decoding category:", err)
 			continue
@@ -86,7 +151,17 @@ func (cat *MongoCategoryRepository) GetAll() ([]domain.Category, error) {
 		return nil, err
 	}
 
-	return categories, nil
+	response := make([]domain.CategoryResponse, len(categories))
+	for i, c := range categories {
+		response[i] = domain.CategoryResponse{
+			ID:   c.ID.Hex(),
+			Name: c.Name,
+		}
+	}
+
+	fmt.Printf("response: %v\n", response)
+
+	return response, nil
 }
 
 func (cat *MongoCategoryRepository) UpdateCategory(id string, category *domain.Category) error {
@@ -94,22 +169,23 @@ func (cat *MongoCategoryRepository) UpdateCategory(id string, category *domain.C
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	ObjId, err := primitive.ObjectIDFromHex(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return err
 	}
 
 	update := bson.M{
 		"$set": bson.M{
-			"name": category.Name,
+			"name":       category.Name,
+			"updated_at": time.Now(),
 		},
 	}
 
 	_, err = cat.db.UpdateOne(
 		ctx,
-		bson.M{"_id": ObjId},
+		bson.M{"_id": objId},
 		update,
-		options.Update().SetUpsert(true),
+		options.Update().SetUpsert(false),
 	)
 
 	return err
@@ -130,7 +206,6 @@ func (cat *MongoCategoryRepository) DeleteCategory(id string) error {
 	}
 
 	return nil
-
 }
 
 func (cat *MongoCategoryRepository) ExistsByName(name string) (bool, error) {
@@ -149,5 +224,6 @@ func (cat *MongoCategoryRepository) ExistsByName(name string) (bool, error) {
 		}
 		return false, err
 	}
+
 	return true, nil
 }

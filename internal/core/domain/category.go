@@ -1,8 +1,18 @@
 package domain
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
-
 type Category struct {
-	ID   primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	Name string             `bson:"name" json:"name"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+type CategoryRequest struct {
+	Name         string `json:"name"`
+	CategoryType string `form:"category_type" validate:"required,oneof=news media" json:"category_type"`
+}
+
+type CategoryResponse struct {
+	ID   string `json:"category_id"`
+	Name string `json:"name"`
 }

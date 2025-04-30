@@ -58,8 +58,8 @@ type (
 
 func New() (*Container, error) {
 	if utils.GetEnv("APP_ENV", "development") != "production" {
-		if _, err := os.Stat(".env"); err == nil {
-			err := godotenv.Load()
+		if _, err := os.Stat("./../.env"); err == nil {
+			err := godotenv.Load("./../.env")
 			if err != nil {
 				return nil, err
 			}

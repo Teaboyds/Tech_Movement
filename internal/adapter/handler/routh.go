@@ -16,10 +16,12 @@ type Router struct {
 }
 
 type RouterParams struct {
-	Config          *config.HTTP
-	NewsHandler     NewsHandler
-	CategoryHandler CategoryHandler
-	MediaHandler    MediaHandler
+	Config             *config.HTTP
+	NewsHandler        NewsHandler
+	CategoryHandler    CategoryHandler
+	MediaHandler       MediaHandler
+	UploadHandler      UploadHandler
+	InfographicHandler InfographicHandler
 }
 
 func SetUpRoutes(p RouterParams) (*Router, error) {
@@ -27,8 +29,8 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 	app := fiber.New()
 
 	app.Get("/swagger/*", swagger.HandlerDefault)
-	app.Static("/upload/news_image", "./upload/news_image")
-	app.Static("/upload/media_image", "./upload/media_image")
+	app.Static("/upload/news", "../upload/news")
+	app.Static("/upload/media", "./upload/media")
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     p.Config.HttpOrigins,
 		AllowHeaders:     "Origin, Content-Type, Accept",
@@ -45,9 +47,8 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			news.Post("/", p.NewsHandler.CreateNews)
 			news.Get("/:id", p.NewsHandler.GetNewsByID)
 			// news.Get("/byCategory/:id", p.NewsHandler.GetNewsByCategory)
-			news.Get("/", p.NewsHandler.GetNewsByPage)
-			news.Put("/:id", p.NewsHandler.UpdateNews)
-			news.Delete("/:id", p.NewsHandler.DeleteNews)
+			// news.Put("/:id", p.NewsHandler.UpdateNews)
+			// news.Delete("/:id", p.NewsHandler.DeleteNews)
 		}
 
 		category := v1.Group("/category")
@@ -59,21 +60,34 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			category.Delete("/:id", p.CategoryHandler.DeleteCategory)
 		}
 
+		upload := v1.Group("/upload")
+		{
+			upload.Post("/", p.UploadHandler.UploadFile)
+			upload.Get("/", p.UploadHandler.GetAllFile)
+			upload.Get("/:id", p.UploadHandler.GetByID)
+			upload.Delete("/:id", p.UploadHandler.DeleteFile)
+		}
+
 		media := v1.Group("/media")
 		{
 			media.Post("/", p.MediaHandler.CreateMedia)
 		}
 
+		infographic := v1.Group("/infographic")
+		{
+			infographic.Post("/", p.InfographicHandler.CreateInfographic)
+			infographic.Get("/", p.InfographicHandler.GetInfoHome)
+		}
+
 		home := v1.Group("/home")
 		{
-			home.Get("/lastedNews", p.NewsHandler.GetLastNews)
-			home.Get("/techNews", p.NewsHandler.GetNewsByCategory)
-			home.Get("/weekNews", p.NewsHandler.GetNewsWeeks)
-			home.Get("/videoMedia", p.MediaHandler.GetMediaHome)
+			// home.Get("/lastedNews", p.NewsHandler.GetLastNews)
+			// home.Get("/TechNews", p.NewsHandler.GetTechNews)
+			home.Get("/HomeLander", p.NewsHandler.GetHomePage)
+			// home.Get("/techNews", p.NewsHandler.GetNewsByCategory)
 		}
 
 	}
-
 	return &Router{app}, nil
 }
 

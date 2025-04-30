@@ -49,29 +49,42 @@ func Init(config *config.Container) {
 	categoryService := service.NewCategoryService(categoryRepo)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 
+	// Upload //
+	uploadRepo := repository.NewUploadRepo(db)
+	if err := uploadRepo.EnsureFileIndexs(); err != nil {
+		slog.Error("Error ensuring news indexes", "error", err)
+		os.Exit(1)
+	}
+	uploadServiec := service.NewUploadService(uploadRepo)
+	uploadHander := handler.NewUploadHandler(uploadServiec)
+
+	// Media //
+	mediaRepo := repository.NewMediaRepositoryMongo(db, categoryRepo)
+	mediaService := service.NewMediaService(mediaRepo)
+	mediaHandler := handler.NewMediaHandler(mediaService)
+
+	// InfoGraphic //
+	infographicRepo := repository.NewInfographicRepositoryMongo(db, categoryRepo, uploadRepo)
+	infographicService := service.NewInfographicService(infographicRepo)
+	infographicHandler := handler.NewInfographicHandler(infographicService)
+
 	// News //
-	newsRepo := repository.NewNewsRepo(db)
+	newsRepo := repository.NewNewsRepo(db, categoryRepo, uploadRepo)
 	if err := newsRepo.EnsureNewsIndexs(); err != nil {
 		slog.Error("Error ensuring news indexes", "error", err)
 		os.Exit(1)
 	}
-	newService := service.NewsService(newsRepo, categoryRepo, cacheClient)
-	newHandler := handler.NewNewsHandler(newService, categoryRepo, cacheClient)
-
-	mediaRepo := repository.NewMediaRepo(db)
-	if err := mediaRepo.EnsureMediaIndexs(); err != nil {
-		slog.Error("Error ensuring news indexes", "error", err)
-		os.Exit(1)
-	}
-	mediaService := service.NewMediaService(mediaRepo)
-	mediaHandler := handler.NewMediaHandler(mediaService, categoryService)
+	newService := service.NewsService(newsRepo, categoryRepo, cacheClient, uploadRepo)
+	newHandler := handler.NewNewsHandler(mediaRepo, newService, categoryRepo, cacheClient, infographicRepo)
 
 	// run server from server.go //
 	router, err := handler.SetUpRoutes(handler.RouterParams{
-		Config:          config.HTTP,
-		NewsHandler:     *newHandler,
-		CategoryHandler: *categoryHandler,
-		MediaHandler:    *mediaHandler,
+		Config:             config.HTTP,
+		NewsHandler:        *newHandler,
+		CategoryHandler:    *categoryHandler,
+		MediaHandler:       *mediaHandler,
+		UploadHandler:      *uploadHander,
+		InfographicHandler: *infographicHandler,
 	})
 	if err != nil {
 		logger.Error("Error initializing router" + "error" + err.Error())

@@ -3,10 +3,11 @@ package handler
 import (
 	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
+	"backend_tech_movement_hex/internal/core/utils"
+	"fmt"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type CategoryHandler struct {
@@ -18,14 +19,23 @@ func NewCategoryHandler(CategoryService port.CategoryService) *CategoryHandler {
 }
 
 func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
-	category := new(domain.Category)
+
+	category := new(domain.CategoryRequest)
 	if err := c.BodyParser(category); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Category input"})
 	}
 
+	if err := utils.ValidateCategoryInput(category); err != nil {
+		log.Printf("news bad validator request: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrResponse{
+			Error: "Invalid Validator News Request",
+		})
+	}
+
 	if err := h.CategoryService.Create(category); err != nil {
+		fmt.Printf("err: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to create category ",
+			"error": err.Error(),
 		})
 	}
 
@@ -62,54 +72,24 @@ func (h *CategoryHandler) GetAllCategory(c *fiber.Ctx) error {
 		})
 	}
 
-	// ใช้วรยุทธ์สร้าง struct ร่างโคลนอีกหนึ่งร่าง เพื่อรับ body request เฉพาะฝั่ง http โดยเฉพาะ เพื่อให้แยกออกจากฝั่ง domain โดยเด็ดขาด //
-	type CategoryResponse struct {
-		ID   primitive.ObjectID `json:"id"`
-		Name string             `json:"name"`
-	}
-
-	// instance categories ให้เป็น slice CategoryResponse แล้ว append เข้าไป //
-	var categories []CategoryResponse
-	for _, catcategories := range category {
-		categories = append(categories, CategoryResponse{
-			ID:   catcategories.ID,
-			Name: catcategories.Name,
-		})
-	}
-
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "all categories",
-		"data":    categories,
+		"data":    category,
 	})
 }
 
 func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 	id := c.Params("id")
-	category := new(domain.Category)
+	var category domain.Category
 
-	if err := c.BodyParser(category); err != nil {
+	if err := c.BodyParser(&category); err != nil {
 		log.Printf("Error is %s", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Invalid Category Input",
 		})
 	}
 
-	ObjID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		log.Printf("Error is %s", err)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid Category Input",
-		})
-	}
-
-	// วรยุทธเดียวกันกับตรง get //
-	NewCategory := &domain.Category{
-		ID:   ObjID,
-		Name: category.Name,
-	}
-
-	err = h.CategoryService.UpdateCategory(ObjID.Hex(), NewCategory)
-	if err != nil {
+	if err := h.CategoryService.UpdateCategory(id, &category); err != nil {
 		log.Printf("Error is %s", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Failed to update category",
@@ -118,22 +98,14 @@ func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Category Updated",
-		"data":    NewCategory,
+		"data":    category,
 	})
 }
 
 func (h *CategoryHandler) DeleteCategory(c *fiber.Ctx) error {
 	id := c.Params("id")
-	ObjID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		log.Printf("Error is %s", err)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid Category ID Input",
-		})
-	}
 
-	err = h.CategoryService.DeleteCategory(ObjID.Hex())
-	if err != nil {
+	if err := h.CategoryService.DeleteCategory(id); err != nil {
 		log.Printf("Error is %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Cannot Delete Category cause Database Issue",

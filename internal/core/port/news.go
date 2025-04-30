@@ -1,32 +1,26 @@
 package port
 
-import (
-	d "backend_tech_movement_hex/internal/core/domain"
-)
+import d "backend_tech_movement_hex/internal/core/domain"
 
 type NewsRepository interface {
-	Create(news *d.News) error
-	GetNewsPagination(lastID string, limit int) ([]d.News, error)
-	GetNewsByID(id string) (*d.News, error)
-	GetNewsByCategory(categoryID string, lastID string) ([]d.News, string, error)
-	GetLastNews() ([]d.News, error)
-	GetNewsByWeek() ([]d.News, error)
-	GetNewsByCategoryHomePage(categoryID string) ([]d.News, error)
+	SaveNews(news *d.NewsRequest) error
+	GetNewsByID(id string) (*d.NewsResponse, error)
+	GetLastNews() ([]*d.HomePageLastedNewResponse, error)
+	GetTechnologyNews() ([]*d.HomePageLastedNewResponse, error)
+	// GetNewsByCategoryHomePage(categoryID string) ([]d.News, error)
 	// GetNewsByTags(name string) ([]d.News, error)
-	UpdateNews(id string, news *d.News) error
-	Delete(id string) error
-	DeleteImg(path string) error
+	// UpdateNews(id string, news *d.News) error
+	// Delete(id string) error
+	// DeleteImg(path string) error
 	EnsureNewsIndexs() error
 }
 
 type NewsService interface {
-	Create(news *d.News) error
-	GetNewsPagination(lastID string, limit int) ([]d.News, error)
-	GetNewsByID(id string) (*d.News, error)
-	GetNewsByCategory(categoryID string, lastID string) ([]d.News, string, error)
-	GetLastNews() ([]d.News, error)
-	GetNewsByWeek() ([]d.News, error)
-	GetNewsByCategoryHomePage(categoryID string) ([]d.News, error)
-	UpdateNews(id string, req *d.UpdateNewsRequestResponse, filename string) error
-	Delete(id string) error
+	CreateNews(news *d.NewsRequest) error
+	GetNewsByID(id string) (*d.NewsResponse, error)
+	GetLastNews() ([]*d.HomePageLastedNewResponse, error)
+	GetTechnologyNews() ([]*d.HomePageLastedNewResponse, error)
+	// GetNewsByCategoryHomePage(categoryID string) ([]d.News, error)
+	// UpdateNews(id string, req *d.UpdateNewsRequestResponse, filename string) error
+	// Delete(id string) error
 }

@@ -3,12 +3,13 @@ package port
 import "backend_tech_movement_hex/internal/core/domain"
 
 type MediaRepository interface {
-	SaveMedia(media *domain.Media) error
-	EnsureMediaIndexs() error
-	GetLastMedia() ([]domain.Media, error)
+	CreateMedia(media *domain.MediaRequest) error
+	GetVideoHome() ([]*domain.VideoResponse, error)
+	GetShortVideoHome() ([]*domain.ShortVideo, error)
 }
 
 type MediaService interface {
-	CreateMedia(media *domain.Media) error
-	GetLastMedia() ([]domain.Media, error)
+	CreateMedia(media *domain.MediaRequest) error
+	GetVideoHome() ([]*domain.VideoResponse, error)
+	GetShortVideoHome() ([]*domain.ShortVideo, error)
 }

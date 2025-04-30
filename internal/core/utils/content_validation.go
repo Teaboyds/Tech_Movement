@@ -22,4 +22,14 @@ func IsContentType(status string) bool {
 	return ContentType[status]
 }
 
+var ImageType = map[string]bool{
+	"news":        true,
+	"banner":      true,
+	"infographic": true,
+}
+
+func IsImageType(status string) bool {
+	return ImageType[status]
+}
+
 ///////////////////////////////// case Content //////////////////////////////

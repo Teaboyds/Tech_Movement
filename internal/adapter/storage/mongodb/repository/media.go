@@ -2,11 +2,14 @@ package repository
 
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
-	dm "backend_tech_movement_hex/internal/core/domain"
+	"backend_tech_movement_hex/internal/adapter/storage/mongodb/models"
+	"backend_tech_movement_hex/internal/core/domain"
+	d "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
 	"fmt"
 	"log"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -15,69 +18,193 @@ import (
 )
 
 type MongoMediaRepository struct {
-	collection *mongo.Collection
+	db           *mongo.Collection
+	categoryRepo port.CategoryRepository
 }
 
-func NewMediaRepo(db *mongodb.Database) port.MediaRepository {
-	return &MongoMediaRepository{collection: db.Collection("media")}
+func NewMediaRepositoryMongo(db *mongodb.Database, categoryRepo port.CategoryRepository) port.MediaRepository {
+	return &MongoMediaRepository{
+		db:           db.Collection("media"),
+		categoryRepo: categoryRepo,
+	}
 }
 
-func (n *MongoMediaRepository) EnsureMediaIndexs() error {
+func (med *MongoMediaRepository) CreateMedia(media *domain.MediaRequest) error {
+
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	indexModel := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: "created_at", Value: -1}, // ใหม่ไปเก่า //
-			{Key: "category_id._id", Value: -1},
-			{Key: "_id", Value: -1},
-		},
+	Category, err := med.categoryRepo.GetByID(media.Category)
+	if err != nil {
+		return err
 	}
 
-	_, err := n.collection.Indexes().CreateOne(ctx, indexModel)
+	CateOBJ, err := primitive.ObjectIDFromHex(Category.ID)
+	if err != nil {
+		return fmt.Errorf("cate_obj error in media repo")
+	}
+
+	fmt.Printf("CateOBJ: %v\n", CateOBJ)
+
+	medDoc := &models.MongoMedia{
+		Title:      media.Title,
+		Content:    media.Content,
+		URL:        media.URL,
+		CategoryID: CateOBJ,
+		Status:     media.Status,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+
+	_, err = med.db.InsertOne(ctx, medDoc)
 
 	return err
 }
-
-func (m *MongoMediaRepository) SaveMedia(media *dm.Media) error {
-
-	ctx, cancle := utils.NewTimeoutContext()
-	defer cancle()
-
-	media.ID = primitive.NewObjectID()
-	_, err := m.collection.InsertOne(ctx, media)
-	return err
-}
-
-func (m *MongoMediaRepository) GetLastMedia() ([]dm.Media, error) {
+func (med *MongoMediaRepository) GetVideoHome() ([]*domain.VideoResponse, error) {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	var lastMedia []dm.Media
+	category, err := med.categoryRepo.GetByName("Short Video")
+	if err != nil {
+		log.Println("error fetching short_video category:", err)
+		return nil, err
+	}
 
-	findOptions := options.Find().
-		SetProjection(bson.M{"_id": 0, "tag": 0, "status": 0, "detail": 0, "updated_at": 0}).
-		SetLimit(4).
-		SetSort(bson.D{{Key: "_id", Value: -1}})
+	categoryObjectID, err := primitive.ObjectIDFromHex(category.ID)
+	if err != nil {
+		log.Println("invalid ObjectID from category ID:", err)
+		return nil, err
+	}
 
-	fileter := bson.M{}
+	log.Printf("Excluded category ID: %v (type: %T)", category.ID, category.ID)
 
-	cursor, err := m.collection.Find(ctx, fileter, findOptions)
+	// Define the aggregation pipeline
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{
+			{Key: "status", Value: true},
+			{Key: "category_id", Value: bson.M{"$ne": categoryObjectID}},
+		}}},
+		{{Key: "$sort", Value: bson.D{
+			{Key: "created_at", Value: -1},
+		}}},
+		{{Key: "$limit", Value: 4}},
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$category_id"},
+			{Key: "news", Value: bson.D{
+				{Key: "$first", Value: "$$ROOT"},
+			}},
+		}}},
+		{{Key: "$lookup", Value: bson.D{
+			{Key: "from", Value: "categories"},
+			{Key: "localField", Value: "_id"},
+			{Key: "foreignField", Value: "_id"},
+			{Key: "as", Value: "category"},
+		}}},
+		{{Key: "$unwind", Value: bson.D{
+			{Key: "path", Value: "$category"},
+			{Key: "preserveNullAndEmptyArrays", Value: true},
+		}}},
+	}
+
+	// Execute the aggregation pipeline
+	cursor, err := med.db.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	if err := cursor.All(ctx, &lastMedia); err != nil {
+	// Prepare the results struct to hold the aggregation response
+	var results []struct {
+		Media    models.MongoMedia    `bson:"news"`
+		Category models.MongoCategory `bson:"category"`
+	}
+
+	// Decode the aggregation results
+	if err := cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+
+	// Map the results to a slice of VideoResponse
+	var responses []*domain.VideoResponse
+	for _, result := range results {
+		categoryResp := d.CategoryResponse{
+			ID:   result.Category.ID.Hex(),
+			Name: result.Category.Name,
+		}
+
+		responses = append(responses, &d.VideoResponse{
+			Title:     result.Media.Title,
+			Content:   result.Media.Content,
+			URL:       result.Media.URL,
+			Category:  categoryResp,
+			CreatedAt: utils.ConvertTimeResponse(result.Media.CreatedAt),
+		})
+	}
+
+	fmt.Printf("responses: %v\n", responses)
+
+	return responses, nil
+}
+
+func (med *MongoMediaRepository) GetShortVideoHome() ([]*domain.ShortVideo, error) {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	var lastNews []models.MongoMedia
+
+	categories, err := med.categoryRepo.GetByName("Short Video")
+	if err != nil {
+		return nil, fmt.Errorf("error fetching category: %w", err)
+	}
+
+	categoryObjectID, err := primitive.ObjectIDFromHex(categories.ID)
+	if err != nil {
+		log.Println("invalid ObjectID from category ID:", err)
+		return nil, err
+	}
+
+	if categories == nil {
+		return nil, fmt.Errorf("category 'short vdo' not found")
+	}
+
+	findOptions := options.Find().
+		SetProjection(bson.M{
+			"_id":         0,
+			"content":     0,
+			"category_id": 0,
+			"created_at":  0,
+			"updated_at":  0,
+			"status":      0,
+		}).
+		SetLimit(4).
+		SetSort(bson.D{{Key: "_id", Value: -1}})
+
+	filter := bson.M{
+		"status":      true,
+		"category_id": categoryObjectID,
+	}
+
+	cursor, err := med.db.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &lastNews); err != nil {
 		log.Printf("Error decoding repo last news: %v", err)
 		return nil, err
 	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, err
+	var shortVideos []*domain.ShortVideo
+	for _, media := range lastNews {
+		shortVideos = append(shortVideos, &domain.ShortVideo{
+			Title: media.Title,
+			URL:   media.URL,
+		})
 	}
 
-	fmt.Printf("lastMedia: %v\n", lastMedia)
-	return lastMedia, nil
+	fmt.Printf("shortVideos: %v\n", shortVideos)
+
+	return shortVideos, nil
 }

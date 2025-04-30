@@ -1,9 +1,9 @@
 package service
 
 import (
-	dm "backend_tech_movement_hex/internal/core/domain"
+	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
-	"backend_tech_movement_hex/internal/core/utils"
+	"errors"
 )
 
 type MediaService struct {
@@ -14,20 +14,33 @@ func NewMediaService(MediaRepo port.MediaRepository) port.MediaService {
 	return &MediaService{MediaRepo: MediaRepo}
 }
 
-func (m *MediaService) CreateMedia(media *dm.Media) error {
-	return m.MediaRepo.SaveMedia(media)
+func (med *MediaService) CreateMedia(media *domain.MediaRequest) error {
+
+	if media.Category == "" {
+		return errors.New("missing id in request body")
+	}
+
+	err := med.MediaRepo.CreateMedia(media)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (m *MediaService) GetLastMedia() ([]dm.Media, error) {
+func (med *MediaService) GetVideoHome() ([]*domain.VideoResponse, error) {
+	video, err := med.MediaRepo.GetVideoHome()
+	if err != nil {
+		return nil, err
+	}
+	return video, nil
+}
 
-	media, err := m.MediaRepo.GetLastMedia()
+func (med *MediaService) GetShortVideoHome() ([]*domain.ShortVideo, error) {
+	short, err := med.MediaRepo.GetShortVideoHome()
 	if err != nil {
 		return nil, err
 	}
 
-	for i := range media {
-		utils.AttachBaseURLToMediaImg(&media[i])
-	}
-
-	return media, nil
+	return short, nil
 }
