@@ -4,35 +4,36 @@ package domain
 import "time"
 
 type News struct {
-	ID            string   `json:"id"`
-	Title         string   `json:"title"`
-	Description   string   `json:"description"`
-	Content       string   `json:"content"`
-	Image         []string `json:"image"`
-	CategoryID    string   `json:"category"`
-	Tag           []string `json:"tag"`
-	Status        bool     `json:"status"`
-	ContentType   string   `json:"content_type"`
-	CreatedAt     string   `json:"created_at"`
-	UpdatedAt     string   `json:"updated_at"`
-	CreatedAtText string   `json:"created_at_text"`
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Content     string   `json:"content"`
+	Image       []string `json:"image"`
+	CategoryID  string   `json:"category"`
+	Tag         []string `json:"tag"`
+	Status      bool     `json:"status"`
+	ContentType string   `json:"content_type"`
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
 }
+
+//  HtmlContent string `json:"html_content"`
+// Read string `json:"read"`
 
 ////////////////////////////////// Response // Request // Models /////////////////////////////////////////////////
 
 type NewsResponse struct {
-	ID            string               `json:"id"`
-	Title         string               `json:"title"`
-	Description   string               `json:"description"`
-	Content       string               `json:"content"`
-	Image         []UploadFileResponse `json:"image"`
-	CategoryID    CategoryResponse     `json:"category"`
-	Tag           []string             `json:"tag"`
-	Status        bool                 `json:"status"`
-	ContentType   string               `json:"content_type"`
-	CreatedAt     string               `json:"created_at"`
-	UpdatedAt     string               `json:"updated_at"`
-	CreatedAtText string               `json:"created_at_text"`
+	ID          string                       `json:"id"`
+	Title       string                       `json:"title"`
+	Description string                       `json:"description"`
+	Content     string                       `json:"content"`
+	Image       []UploadFileResponseHomePage `json:"image"`
+	CategoryID  CategoryResponse             `json:"category"`
+	Tag         []string                     `json:"tag"`
+	Status      bool                         `json:"status"`
+	ContentType string                       `json:"content_type"`
+	CreatedAt   string                       `json:"created_at"`
+	UpdatedAt   string                       `json:"updated_at"`
 }
 
 type NewsRequest struct {

@@ -19,6 +19,12 @@ func ConnectDB(ctx context.Context, config *config.DB) (*Database, error) {
 	mongoURL := config.URL
 
 	clientOption := options.Client().ApplyURI(mongoURL)
+	// .SetAuth(options.Credential{
+	// 		AuthSource:    os.Getenv("DB_AUTHSOURCE"),
+	// 		Username:      os.Getenv("DB_USERNAME"),
+	// 		Password:      os.Getenv("MONGO_PASSWORD"),
+	// 		AuthMechanism: os.Getenv("DB_AUTHMEC"),
+	// 	})
 	client, err := mongo.Connect(ctx, clientOption)
 	if err != nil {
 		log.Fatal(err)

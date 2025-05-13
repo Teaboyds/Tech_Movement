@@ -22,6 +22,7 @@ type RouterParams struct {
 	MediaHandler       MediaHandler
 	UploadHandler      UploadHandler
 	InfographicHandler InfographicHandler
+	BannerHandler      BannerHandler
 }
 
 func SetUpRoutes(p RouterParams) (*Router, error) {
@@ -45,7 +46,7 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 		news := v1.Group("/news")
 		{
 			news.Post("/", p.NewsHandler.CreateNews)
-			news.Get("/:id", p.NewsHandler.GetNewsByID)
+			news.Get("/", p.NewsHandler.Find)
 			// news.Get("/byCategory/:id", p.NewsHandler.GetNewsByCategory)
 			// news.Put("/:id", p.NewsHandler.UpdateNews)
 			// news.Delete("/:id", p.NewsHandler.DeleteNews)
@@ -85,6 +86,12 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			// home.Get("/TechNews", p.NewsHandler.GetTechNews)
 			home.Get("/HomeLander", p.NewsHandler.GetHomePage)
 			// home.Get("/techNews", p.NewsHandler.GetNewsByCategory)
+		}
+
+		banner := v1.Group("/banner")
+		{
+			banner.Post("/", p.BannerHandler.CreateBanner)
+			banner.Get("/:id", p.BannerHandler.GetBanner)
 		}
 
 	}

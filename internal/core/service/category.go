@@ -14,7 +14,7 @@ func NewCategoryService(CatRepo port.CategoryRepository) port.CategoryService {
 	return &CategoryService{CatRepo: CatRepo}
 }
 
-func (cats *CategoryService) Create(category *domain.CategoryRequest) error {
+func (cats *CategoryService) Create(category *domain.Category) error {
 
 	existingName, err := cats.CatRepo.ExistsByName(category.Name)
 	if err != nil {
@@ -40,7 +40,13 @@ func (cats *CategoryService) GetByID(id string) (*domain.CategoryResponse, error
 		return nil, err
 	}
 
-	return category, nil
+	CateDTO := &domain.CategoryResponse{
+		ID:           category.ID,
+		Name:         category.Name,
+		CategoryType: category.CategoryType,
+	}
+
+	return CateDTO, nil
 }
 
 func (cats *CategoryService) GetAll() ([]domain.CategoryResponse, error) {
@@ -50,7 +56,35 @@ func (cats *CategoryService) GetAll() ([]domain.CategoryResponse, error) {
 		return nil, err
 	}
 
-	return categories, nil
+	var cateDTO []domain.CategoryResponse
+	for _, cate := range categories {
+		cateDTO = append(cateDTO, domain.CategoryResponse{
+			ID:           cate.ID,
+			Name:         cate.Name,
+			CategoryType: cate.CategoryType,
+		})
+	}
+
+	return cateDTO, nil
+}
+
+func (cats *CategoryService) GetByIDs(ids []string) ([]*domain.CategoryResponse, error) {
+
+	Cate, err := cats.CatRepo.GetByIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	var responses []*domain.CategoryResponse
+	for _, category := range Cate {
+		resp := &domain.CategoryResponse{
+			ID:   category.ID,
+			Name: category.Name,
+		}
+		responses = append(responses, resp)
+	}
+
+	return responses, err
 }
 
 func (cats *CategoryService) GetByName(name string) (*domain.Category, error) {
@@ -59,11 +93,20 @@ func (cats *CategoryService) GetByName(name string) (*domain.Category, error) {
 
 func (cats *CategoryService) UpdateCategory(id string, category *domain.Category) error {
 
-	if category.Name == "" {
-		return fmt.Errorf("please input your new name")
+	existingCate, err := cats.CatRepo.GetByID(id)
+	if err != nil {
+		return fmt.Errorf("category not found")
 	}
 
-	err := cats.CatRepo.UpdateCategory(id, category)
+	if category.Name != "" {
+		existingCate.Name = category.Name
+	}
+
+	if category.CategoryType != "" {
+		existingCate.CategoryType = category.CategoryType
+	}
+
+	err = cats.CatRepo.UpdateCategory(id, category)
 	if err != nil {
 		return err
 	}

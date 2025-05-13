@@ -4,6 +4,7 @@ package repository
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb/models"
+	mongoUtils "backend_tech_movement_hex/internal/adapter/storage/mongodb/utils"
 	"backend_tech_movement_hex/internal/core/domain"
 	d "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
@@ -19,16 +20,18 @@ import (
 )
 
 type MongoNewsRepository struct {
-	collection   *mongo.Collection
-	categoryRepo port.CategoryRepository
-	uploadRepo   port.UploadRepository
+	collection      *mongo.Collection
+	categoryRepo    port.CategoryRepository
+	categoryService port.CategoryService
+	uploadRepo      port.UploadRepository
 }
 
-func NewNewsRepo(db *mongodb.Database, categoryRepo port.CategoryRepository, uploadRepo port.UploadRepository) port.NewsRepository {
+func NewNewsRepo(db *mongodb.Database, categoryRepo port.CategoryRepository, uploadRepo port.UploadRepository, categoryService port.CategoryService) port.NewsRepository {
 	return &MongoNewsRepository{
-		collection:   db.Collection("news"),
-		categoryRepo: categoryRepo,
-		uploadRepo:   uploadRepo,
+		collection:      db.Collection("news"),
+		categoryRepo:    categoryRepo,
+		uploadRepo:      uploadRepo,
+		categoryService: categoryService,
 	}
 }
 
@@ -50,49 +53,17 @@ func (n *MongoNewsRepository) EnsureNewsIndexs() error {
 }
 
 // /// create area ///
-func (n *MongoNewsRepository) SaveNews(news *d.NewsRequest) error {
+func (n *MongoNewsRepository) SaveNews(news *d.News) error {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	Category, err := n.categoryRepo.GetByID(news.Category)
+	mongoNews, err := mongoUtils.MapNewsToMongo(news)
 	if err != nil {
 		return err
 	}
 
-	CateOBJ, err := primitive.ObjectIDFromHex(Category.ID)
-	if err != nil {
-		return err
-	}
-
-	File, err := n.uploadRepo.ValidateImageIDs(news.Image)
-	if err != nil {
-		return err
-	}
-
-	var imageObjectIDs []primitive.ObjectID
-	for _, id := range File {
-		objID, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			return fmt.Errorf("error converting image ID: %w", err)
-		}
-		imageObjectIDs = append(imageObjectIDs, objID)
-	}
-
-	newDoc := &models.MongoNews{
-		Title:       news.Title,
-		Description: news.Description,
-		Content:     news.Content,
-		Image:       imageObjectIDs,
-		CategoryID:  CateOBJ,
-		Tag:         news.Tag,
-		Status:      news.Status,
-		ContentType: news.ContentType,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}
-
-	_, err = n.collection.InsertOne(ctx, newDoc)
+	_, err = n.collection.InsertOne(ctx, mongoNews)
 	return err
 }
 
@@ -134,73 +105,41 @@ func (n *MongoNewsRepository) SaveNews(news *d.NewsRequest) error {
 // 	}
 // 	defer cursor.Close(ctx)
 
-// 	return news, nil
-// }
-
-func (n *MongoNewsRepository) GetNewsByID(id string) (*d.NewsResponse, error) {
+//		return news, nil
+//	}
+func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	ObjID, err := primitive.ObjectIDFromHex(id)
+	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
 
-	var newsResp models.MongoNews
-	err = n.collection.FindOne(ctx, bson.M{"_id": ObjID}).Decode(&newsResp)
+	var mongoNews models.MongoNews
+	err = n.collection.FindOne(ctx, bson.M{"_id": objID}).Decode(&mongoNews)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, err
-		}
 		return nil, err
 	}
 
-	var images []domain.UploadFileResponse
-	if len(newsResp.Image) > 0 {
-		imgIDs := make([]string, len(newsResp.Image))
-		for i, id := range newsResp.Image {
-			imgIDs[i] = id.Hex()
-		}
-
-		uploadFiles, err := n.uploadRepo.GetFilesByIDs(imgIDs)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, f := range uploadFiles {
-			images = append(images, domain.UploadFileResponse{
-				ID:       f.ID,
-				Path:     f.Path,
-				Name:     f.Name,
-				FileType: f.FileType,
-			})
-		}
+	var imageIDs []string
+	for _, oid := range mongoNews.Image {
+		imageIDs = append(imageIDs, oid.Hex())
 	}
 
-	var categoryResponse domain.CategoryResponse
-	if newsResp.CategoryID != primitive.NilObjectID {
-		category, err := n.categoryRepo.GetByID(newsResp.CategoryID.Hex())
-		if err != nil {
-			return nil, err
-		}
-		categoryResponse = *category
+	response := &domain.News{
+		ID:          mongoNews.ID.Hex(),
+		Title:       mongoNews.Title,
+		Description: mongoNews.Description,
+		Content:     mongoNews.Content,
+		Image:       imageIDs,
+		CategoryID:  mongoNews.CategoryID.Hex(),
+		Tag:         mongoNews.Tag,
+		Status:      mongoNews.Status,
+		ContentType: mongoNews.ContentType,
+		CreatedAt:   mongoNews.CreatedAt.Format(time.RFC1123),
+		UpdatedAt:   mongoNews.UpdatedAt.Format(time.RFC1123),
 	}
-
-	response := &domain.NewsResponse{
-		ID:          newsResp.ID.Hex(),
-		Title:       newsResp.Title,
-		Description: newsResp.Description,
-		Content:     newsResp.Content,
-		Image:       images,
-		CategoryID:  categoryResponse,
-		Tag:         newsResp.Tag,
-		Status:      newsResp.Status,
-		ContentType: newsResp.ContentType,
-		CreatedAt:   newsResp.CreatedAt.Format(time.RFC1123),
-		UpdatedAt:   newsResp.UpdatedAt.Format(time.RFC1123),
-	}
-
-	fmt.Printf("response: %v\n", response)
 
 	return response, nil
 }
@@ -258,7 +197,7 @@ func (n *MongoNewsRepository) GetLastNews() ([]*domain.HomePageLastedNewResponse
 		return nil, err
 	}
 
-	categories, err := n.categoryRepo.GetByIDs(categoryIDs)
+	categories, err := n.categoryService.GetByIDs(categoryIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -384,6 +323,72 @@ func (n *MongoNewsRepository) GetTechnologyNews() ([]*d.HomePageLastedNewRespons
 	}
 
 	return responses, nil
+}
+
+func (n *MongoNewsRepository) Find(catID, ConType, Sort string, limit, page int64) ([]*d.News, error) {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	Finder := bson.M{}
+
+	if catID != "" {
+		objID, err := mongoUtils.ConvertStringToObjectID(catID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid category ID: %w", err)
+		}
+		Finder["category_id"] = objID
+	}
+
+	if ConType != "" {
+		Finder["content_type"] = ConType
+	}
+
+	opts := options.Find()
+
+	if Sort == "asc" {
+		opts.SetSort(bson.D{{Key: "created_at", Value: 1}})
+	} else if Sort == "desc" {
+		opts.SetSort(bson.D{{Key: "created_at", Value: -1}})
+	}
+
+	skip := (page - 1) * limit
+	opts.SetLimit(limit).SetSkip(skip)
+
+	cursor, err := n.collection.Find(ctx, Finder, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var results []*d.News
+	for cursor.Next(ctx) {
+		var news models.MongoNews
+		if err := cursor.Decode(&news); err != nil {
+			return nil, err
+		}
+
+		var imageIDs []string
+		for _, oid := range news.Image {
+			imageIDs = append(imageIDs, oid.Hex())
+		}
+
+		results = append(results, &d.News{
+			ID:          news.ID.Hex(),
+			Title:       news.Title,
+			Description: news.Description,
+			Content:     news.Content,
+			Image:       imageIDs,
+			CategoryID:  news.CategoryID.Hex(),
+			Tag:         news.Tag,
+			Status:      news.Status,
+			ContentType: news.ContentType,
+			CreatedAt:   news.CreatedAt.String(),
+			UpdatedAt:   news.UpdatedAt.String(),
+		})
+	}
+
+	return results, nil
 }
 
 // func (n *MongoNewsRepository) GetNewsByCategoryHomePage(categoryID string) ([]d.News, error) {

@@ -25,7 +25,7 @@ func NewCategoryRepositoryMongo(db *mongodb.Database) port.CategoryRepository {
 	return &MongoCategoryRepository{db: db.Collection("categories")}
 }
 
-func (cat *MongoCategoryRepository) Create(category *domain.CategoryRequest) error {
+func (cat *MongoCategoryRepository) Create(category *domain.Category) error {
 
 	cateDoc := &models.MongoCategory{
 		Name:         category.Name,
@@ -38,7 +38,7 @@ func (cat *MongoCategoryRepository) Create(category *domain.CategoryRequest) err
 	return err
 }
 
-func (cat *MongoCategoryRepository) GetByID(id string) (*domain.CategoryResponse, error) {
+func (cat *MongoCategoryRepository) GetByID(id string) (*domain.Category, error) {
 
 	ObjID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -57,15 +57,16 @@ func (cat *MongoCategoryRepository) GetByID(id string) (*domain.CategoryResponse
 		return nil, err
 	}
 
-	response := &domain.CategoryResponse{
-		ID:   category.ID.Hex(),
-		Name: category.Name,
+	response := &domain.Category{
+		ID:           category.ID.Hex(),
+		CategoryType: category.CategoryType,
+		Name:         category.Name,
 	}
 
 	return response, nil
 }
 
-func (cat *MongoCategoryRepository) GetByIDs(ids []string) ([]*domain.CategoryResponse, error) {
+func (cat *MongoCategoryRepository) GetByIDs(ids []string) ([]*domain.Category, error) {
 
 	objIDs := make([]primitive.ObjectID, 0, len(ids))
 	for _, id := range ids {
@@ -95,9 +96,9 @@ func (cat *MongoCategoryRepository) GetByIDs(ids []string) ([]*domain.CategoryRe
 		return nil, err
 	}
 
-	var responses []*domain.CategoryResponse
+	var responses []*domain.Category
 	for _, category := range categories {
-		resp := &domain.CategoryResponse{
+		resp := &domain.Category{
 			ID:   category.ID.Hex(),
 			Name: category.Name,
 		}
@@ -130,7 +131,7 @@ func (cat *MongoCategoryRepository) GetByName(name string) (*domain.Category, er
 	return resp, nil
 }
 
-func (cat *MongoCategoryRepository) GetAll() ([]domain.CategoryResponse, error) {
+func (cat *MongoCategoryRepository) GetAll() ([]domain.Category, error) {
 	var categories []models.MongoCategory
 	cursor, err := cat.db.Find(context.Background(), bson.M{})
 	if err != nil {
@@ -151,9 +152,9 @@ func (cat *MongoCategoryRepository) GetAll() ([]domain.CategoryResponse, error) 
 		return nil, err
 	}
 
-	response := make([]domain.CategoryResponse, len(categories))
+	response := make([]domain.Category, len(categories))
 	for i, c := range categories {
-		response[i] = domain.CategoryResponse{
+		response[i] = domain.Category{
 			ID:   c.ID.Hex(),
 			Name: c.Name,
 		}
@@ -185,7 +186,7 @@ func (cat *MongoCategoryRepository) UpdateCategory(id string, category *domain.C
 		ctx,
 		bson.M{"_id": objId},
 		update,
-		options.Update().SetUpsert(false),
+		options.Update(),
 	)
 
 	return err

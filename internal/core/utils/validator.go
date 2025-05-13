@@ -2,6 +2,8 @@ package utils
 
 import (
 	"backend_tech_movement_hex/internal/core/domain"
+	"errors"
+	"reflect"
 
 	"github.com/go-playground/validator"
 	"github.com/gofiber/fiber/v2"
@@ -72,6 +74,42 @@ func FixMultipartArray(c *fiber.Ctx, input *domain.NewsRequest) error {
 	// ถ้า form มี field news_image หรือ tag ถึงค่อย override
 	if newsImgs, ok := form.Value["news_image"]; ok {
 		input.Image = newsImgs
+	}
+
+	return nil
+}
+
+// Reusable MultipartForm //
+func FixMultipartArrayV2(c *fiber.Ctx, input interface{}, fieldMap map[string]string) error {
+	form, err := c.MultipartForm()
+	if err != nil {
+		return err
+	}
+
+	val := reflect.ValueOf(input)
+	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
+		return errors.New("input must be a pointer to struct")
+	}
+
+	val = val.Elem() // struct
+
+	for formField, structField := range fieldMap {
+		values, ok := form.Value[formField]
+		if !ok {
+			continue
+		}
+
+		field := val.FieldByName(structField)
+		if !field.IsValid() {
+			return errors.New("struct does not contain field: " + structField)
+		}
+
+		// Set only if it's []string
+		if field.Kind() == reflect.Slice && field.Type().Elem().Kind() == reflect.String {
+			if field.CanSet() {
+				field.Set(reflect.ValueOf(values))
+			}
+		}
 	}
 
 	return nil

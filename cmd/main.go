@@ -60,7 +60,7 @@ func Init(config *config.Container) {
 
 	// Media //
 	mediaRepo := repository.NewMediaRepositoryMongo(db, categoryRepo)
-	mediaService := service.NewMediaService(mediaRepo)
+	mediaService := service.NewMediaService(mediaRepo, categoryRepo)
 	mediaHandler := handler.NewMediaHandler(mediaService)
 
 	// InfoGraphic //
@@ -68,14 +68,19 @@ func Init(config *config.Container) {
 	infographicService := service.NewInfographicService(infographicRepo)
 	infographicHandler := handler.NewInfographicHandler(infographicService)
 
+	// Banner //
+	bannerRepo := repository.NewBannersRepoMongo(db)
+	bannerService := service.NewBannerService(bannerRepo, categoryRepo, uploadServiec)
+	bannerHandler := handler.NewBannerHandler(bannerService, categoryService)
+
 	// News //
-	newsRepo := repository.NewNewsRepo(db, categoryRepo, uploadRepo)
+	newsRepo := repository.NewNewsRepo(db, categoryRepo, uploadRepo, categoryService)
 	if err := newsRepo.EnsureNewsIndexs(); err != nil {
 		slog.Error("Error ensuring news indexes", "error", err)
 		os.Exit(1)
 	}
-	newService := service.NewsService(newsRepo, categoryRepo, cacheClient, uploadRepo)
-	newHandler := handler.NewNewsHandler(mediaRepo, newService, categoryRepo, cacheClient, infographicRepo)
+	newService := service.NewsService(newsRepo, categoryRepo, cacheClient, uploadRepo, categoryService)
+	newHandler := handler.NewNewsHandler(mediaService, newService, categoryService, cacheClient, infographicService)
 
 	// run server from server.go //
 	router, err := handler.SetUpRoutes(handler.RouterParams{
@@ -85,6 +90,7 @@ func Init(config *config.Container) {
 		MediaHandler:       *mediaHandler,
 		UploadHandler:      *uploadHander,
 		InfographicHandler: *infographicHandler,
+		BannerHandler:      *bannerHandler,
 	})
 	if err != nil {
 		logger.Error("Error initializing router" + "error" + err.Error())

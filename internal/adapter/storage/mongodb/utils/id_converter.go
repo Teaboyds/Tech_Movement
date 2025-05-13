@@ -13,3 +13,11 @@ func ToObjectID(hexStr, label string) (primitive.ObjectID, error) {
 	}
 	return id, nil
 }
+
+func ConvertStringToObjectID(id string) (primitive.ObjectID, error) {
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return primitive.NilObjectID, fmt.Errorf("invalid object ID format: %w", err)
+	}
+	return objectID, nil
+}

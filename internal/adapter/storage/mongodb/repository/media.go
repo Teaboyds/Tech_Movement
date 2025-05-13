@@ -34,50 +34,38 @@ func (med *MongoMediaRepository) CreateMedia(media *domain.MediaRequest) error {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	Category, err := med.categoryRepo.GetByID(media.Category)
-	if err != nil {
-		return err
-	}
-
-	CateOBJ, err := primitive.ObjectIDFromHex(Category.ID)
+	cateObj, err := primitive.ObjectIDFromHex(media.Category)
 	if err != nil {
 		return fmt.Errorf("cate_obj error in media repo")
 	}
 
-	fmt.Printf("CateOBJ: %v\n", CateOBJ)
-
-	medDoc := &models.MongoMedia{
+	mediaDoc := &models.MongoMedia{
 		Title:      media.Title,
 		Content:    media.Content,
 		URL:        media.URL,
-		CategoryID: CateOBJ,
+		CategoryID: cateObj,
 		Status:     media.Status,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
 
-	_, err = med.db.InsertOne(ctx, medDoc)
+	_, err = med.db.InsertOne(ctx, mediaDoc)
 
 	return err
 }
-func (med *MongoMediaRepository) GetVideoHome() ([]*domain.VideoResponse, error) {
+
+func (med *MongoMediaRepository) GetVideoHome(cateId string) ([]*domain.VideoResponse, error) {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	category, err := med.categoryRepo.GetByName("Short Video")
-	if err != nil {
-		log.Println("error fetching short_video category:", err)
-		return nil, err
-	}
-
-	categoryObjectID, err := primitive.ObjectIDFromHex(category.ID)
+	categoryObjectID, err := primitive.ObjectIDFromHex(cateId)
 	if err != nil {
 		log.Println("invalid ObjectID from category ID:", err)
 		return nil, err
 	}
 
-	log.Printf("Excluded category ID: %v (type: %T)", category.ID, category.ID)
+	log.Printf("Excluded category ID: %v (type: %T)", categoryObjectID, categoryObjectID)
 
 	// Define the aggregation pipeline
 	pipeline := mongo.Pipeline{
@@ -125,7 +113,6 @@ func (med *MongoMediaRepository) GetVideoHome() ([]*domain.VideoResponse, error)
 		return nil, err
 	}
 
-	// Map the results to a slice of VideoResponse
 	var responses []*domain.VideoResponse
 	for _, result := range results {
 		categoryResp := d.CategoryResponse{

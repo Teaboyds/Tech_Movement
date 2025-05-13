@@ -64,12 +64,28 @@ func (r *Redis) Delete(ctx context.Context, key string) error {
 	return r.RedisClient.Del(ctx, key).Err()
 }
 
-func (r *Redis) DeletePattern(ctx context.Context, key string) error {
-	keys, err := r.RedisClient.Keys(ctx, key).Result()
-	if err != nil {
-		return err
+func (r *Redis) DeletePattern(ctx context.Context, pattern string) error {
+	var cursor uint64 = 0
+	for {
+
+		keys, nextCursor, err := r.RedisClient.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return err
+		}
+
+		if len(keys) > 0 {
+			if err := r.RedisClient.Del(ctx, keys...).Err(); err != nil {
+				return err
+			}
+		}
+
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+
 	}
-	return r.RedisClient.Del(ctx, keys...).Err()
+	return nil
 }
 
 func (r *Redis) IncrementVersion(ctx context.Context, key string) (int64, error) {

@@ -12,26 +12,26 @@ import (
 )
 
 type NewsHandler struct {
-	mediaService port.MediaService
-	service      port.NewsService
-	categoryRepo port.CategoryRepository
-	cacheService port.CacheRepository
-	infoGraphic  port.InfographicService
+	mediaService    port.MediaService
+	service         port.NewsService
+	categoryService port.CategoryService
+	cacheService    port.CacheRepository
+	infoGraphic     port.InfographicService
 }
 
 func NewNewsHandler(
 	mediaService port.MediaService,
 	service port.NewsService,
-	CategoryService port.CategoryRepository,
+	CategoryService port.CategoryService,
 	cacheService port.CacheRepository,
 	infoGraphic port.InfographicService,
 ) *NewsHandler {
 	return &NewsHandler{
-		mediaService: mediaService,
-		service:      service,
-		categoryRepo: CategoryService,
-		cacheService: cacheService,
-		infoGraphic:  infoGraphic,
+		mediaService:    mediaService,
+		service:         service,
+		categoryService: CategoryService,
+		cacheService:    cacheService,
+		infoGraphic:     infoGraphic,
 	}
 }
 
@@ -61,7 +61,18 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 		})
 	}
 
-	err := h.service.CreateNews(&input)
+	req := &domain.News{
+		Title:       input.Title,
+		Description: input.Description,
+		Content:     input.Content,
+		Image:       input.Image,
+		CategoryID:  input.Category,
+		Tag:         input.Tag,
+		Status:      input.Status,
+		ContentType: input.ContentType,
+	}
+
+	err := h.service.CreateNews(req)
 	if err != nil {
 		log.Printf("create news error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -83,10 +94,29 @@ func (h *NewsHandler) GetNewsByID(c *fiber.Ctx) error {
 		})
 	}
 
-	fmt.Printf("news: %v\n", news)
-
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"data": news,
+	})
+}
+
+func (h *NewsHandler) Find(c *fiber.Ctx) error {
+
+	find := c.Queries()
+	catId := find["categoryID"]
+	conType := find["contentType"]
+	sort := find["sort"]
+	limit := find["limit"]
+	page := find["page"]
+
+	findingNemo, err := h.service.Find(catId, conType, sort, limit, page)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"data": findingNemo,
 	})
 }
 

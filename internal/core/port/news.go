@@ -1,10 +1,12 @@
 package port
 
-import d "backend_tech_movement_hex/internal/core/domain"
+import (
+	d "backend_tech_movement_hex/internal/core/domain"
+)
 
 type NewsRepository interface {
-	SaveNews(news *d.NewsRequest) error
-	GetNewsByID(id string) (*d.NewsResponse, error)
+	SaveNews(news *d.News) error
+	GetNewsByID(id string) (*d.News, error)
 	GetLastNews() ([]*d.HomePageLastedNewResponse, error)
 	GetTechnologyNews() ([]*d.HomePageLastedNewResponse, error)
 	// GetNewsByCategoryHomePage(categoryID string) ([]d.News, error)
@@ -13,14 +15,16 @@ type NewsRepository interface {
 	// Delete(id string) error
 	// DeleteImg(path string) error
 	EnsureNewsIndexs() error
+	Find(catID, ConType, Sort string, limit, page int64) ([]*d.News, error)
 }
 
 type NewsService interface {
-	CreateNews(news *d.NewsRequest) error
+	CreateNews(news *d.News) error
 	GetNewsByID(id string) (*d.NewsResponse, error)
 	GetLastNews() ([]*d.HomePageLastedNewResponse, error)
 	GetTechnologyNews() ([]*d.HomePageLastedNewResponse, error)
 	// GetNewsByCategoryHomePage(categoryID string) ([]d.News, error)
 	// UpdateNews(id string, req *d.UpdateNewsRequestResponse, filename string) error
 	// Delete(id string) error
+	Find(catID, ConType, Sort, limit, page string) ([]*d.NewsResponse, error)
 }

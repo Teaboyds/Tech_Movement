@@ -1,6 +1,7 @@
 package service
 
 import (
+	"backend_tech_movement_hex/internal/core/domain"
 	ul "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
@@ -74,4 +75,27 @@ func (ul *UploadService) DeleteFile(id string) error {
 	}
 
 	return nil
+}
+
+func (ul *UploadService) GetFilesByIDsVTest(ids []string) ([]ul.UploadFileResponse, error) {
+
+	files, err := ul.UploadRepo.GetFilesByIDsVTest(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp []domain.UploadFileResponse
+	for _, f := range files {
+		resp = append(resp, domain.UploadFileResponse{
+			Path:     f.Path,
+			Name:     f.Name,
+			FileType: f.FileType,
+		})
+	}
+
+	return resp, nil
+}
+
+func (ul *UploadService) ValidateImageIDs(ids []string) ([]string, error) {
+	return ul.UploadRepo.ValidateImageIDs(ids)
 }

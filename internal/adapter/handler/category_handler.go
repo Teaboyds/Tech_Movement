@@ -32,7 +32,12 @@ func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.CategoryService.Create(category); err != nil {
+	cateDTO := &domain.Category{
+		Name:         category.Name,
+		CategoryType: category.CategoryType,
+	}
+
+	if err := h.CategoryService.Create(cateDTO); err != nil {
 		fmt.Printf("err: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),

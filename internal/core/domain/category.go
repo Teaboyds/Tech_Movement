@@ -1,10 +1,11 @@
 package domain
 
 type Category struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	CategoryType string `json:"category_type"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 type CategoryRequest struct {
@@ -13,6 +14,7 @@ type CategoryRequest struct {
 }
 
 type CategoryResponse struct {
-	ID   string `json:"category_id"`
-	Name string `json:"name"`
+	ID           string `json:"category_id"`
+	Name         string `json:"name"`
+	CategoryType string `json:"category_type"`
 }
