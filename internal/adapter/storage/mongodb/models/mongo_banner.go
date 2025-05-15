@@ -8,7 +8,7 @@ import (
 
 type MongoBanner struct {
 	ID          primitive.ObjectID   `bson:"_id,omitempty"`
-	Title       string               `bson:"name"`
+	Title       string               `bson:"title"`
 	ContentType string               `bson:"content_type"`
 	Status      bool                 `bson:"status"`
 	CategoryID  primitive.ObjectID   `bson:"category_id"`

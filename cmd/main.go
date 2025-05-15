@@ -70,7 +70,7 @@ func Init(config *config.Container) {
 
 	// Banner //
 	bannerRepo := repository.NewBannersRepoMongo(db)
-	bannerService := service.NewBannerService(bannerRepo, categoryRepo, uploadServiec)
+	bannerService := service.NewBannerService(bannerRepo, categoryRepo, uploadServiec, uploadRepo, categoryService)
 	bannerHandler := handler.NewBannerHandler(bannerService, categoryService)
 
 	// News //
