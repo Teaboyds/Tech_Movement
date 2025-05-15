@@ -96,6 +96,9 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 		{
 			banner.Post("/", p.BannerHandler.CreateBanner)
 			banner.Get("/:id", p.BannerHandler.GetBanner)
+			banner.Get("/", p.BannerHandler.GetBanners)
+			banner.Put("/:id", p.BannerHandler.UpdateBanner)
+			banner.Delete("/:id", p.BannerHandler.DeleteBanner)
 		}
 
 	}

@@ -21,9 +21,9 @@ type BannerReq struct {
 
 // Response //
 type BannerClient struct {
-	Title       string            `json:"title"`
-	ContentType string            `json:"content_type"`
-	Status      bool              `json:"status"`
-	Category    *CategoryResponse `json:"category"`
+	Title       string           `json:"title"`
+	ContentType string           `json:"content_type"`
+	Status      bool             `json:"status"`
+	Category    CategoryResponse `json:"category"`
 	Images      []UploadFileResponse
 }
