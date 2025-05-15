@@ -59,13 +59,13 @@ func Init(config *config.Container) {
 	uploadHander := handler.NewUploadHandler(uploadServiec)
 
 	// Media //
-	mediaRepo := repository.NewMediaRepositoryMongo(db, categoryRepo)
-	mediaService := service.NewMediaService(mediaRepo, categoryRepo)
+	mediaRepo := repository.NewMediaRepositoryMongo(db)
+	mediaService := service.NewMediaService(mediaRepo, categoryRepo, categoryService)
 	mediaHandler := handler.NewMediaHandler(mediaService)
 
 	// InfoGraphic //
-	infographicRepo := repository.NewInfographicRepositoryMongo(db, categoryRepo, uploadRepo)
-	infographicService := service.NewInfographicService(infographicRepo)
+	infographicRepo := repository.NewInfographicRepositoryMongo(db)
+	infographicService := service.NewInfographicService(infographicRepo, uploadServiec, categoryService)
 	infographicHandler := handler.NewInfographicHandler(infographicService)
 
 	// Banner //
@@ -74,7 +74,7 @@ func Init(config *config.Container) {
 	bannerHandler := handler.NewBannerHandler(bannerService, categoryService)
 
 	// News //
-	newsRepo := repository.NewNewsRepo(db, categoryRepo, uploadRepo, categoryService)
+	newsRepo := repository.NewNewsRepo(db)
 	if err := newsRepo.EnsureNewsIndexs(); err != nil {
 		slog.Error("Error ensuring news indexes", "error", err)
 		os.Exit(1)

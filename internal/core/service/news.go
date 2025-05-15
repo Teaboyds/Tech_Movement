@@ -37,12 +37,12 @@ func (n *NewsServiceImpl) CreateNews(news *d.News) error {
 
 	_, err := n.fileRepo.ValidateImageIDs(news.Image)
 	if err != nil {
-		return fmt.Errorf("failed to get image files: %w", err)
+		return fmt.Errorf("failed to get image files: %s", err)
 	}
 
 	_, err = n.categoryRepo.GetByID(news.CategoryID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get category: %s ", err)
 	}
 
 	if len(news.Image) == 0 {
@@ -63,7 +63,7 @@ func (n *NewsServiceImpl) CreateNews(news *d.News) error {
 	if err != nil {
 		return err
 	} else {
-		fmt.Println("Deleted cache with pattern: %s", findCache)
+		log.Printf("Deleted cache with pattern: %s", findCache)
 	}
 
 	return nil
@@ -119,35 +119,181 @@ func (n *NewsServiceImpl) GetNewsByID(id string) (*d.NewsResponse, error) {
 	return response, nil
 }
 
-func (n *NewsServiceImpl) GetLastNews() ([]*d.HomePageLastedNewResponse, error) {
+func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponse, error) {
 
-	news, err := n.newRepo.GetLastNews()
+	lastedNews, err := n.newRepo.GetLastNews()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, item := range news {
+	imageIDMap := make(map[string]struct{})
+	categoryIDMap := make(map[string]struct{})
+
+	for _, news := range lastedNews {
+		for _, imgID := range news.Image {
+			imageIDMap[imgID] = struct{}{}
+		}
+		if news.CategoryID != "" {
+			categoryIDMap[news.CategoryID] = struct{}{}
+		}
+	}
+
+	imageIDs := keysFromMap(imageIDMap)
+	categoryIDs := keysFromMap(categoryIDMap)
+
+	uploadFiles, err := n.fileRepo.GetFilesByIDs(imageIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	categories, err := n.categoryService.GetByIDs(categoryIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	uploadFileMap := make(map[string]domain.UploadFileResponseHomePage)
+	for _, f := range uploadFiles {
+		uploadFileMap[f.ID] = domain.UploadFileResponseHomePage{
+			ID:       f.ID,
+			Path:     f.Path,
+			Filetype: f.FileType,
+		}
+	}
+
+	categoryMap := make(map[string]domain.CategoryResponse)
+	for _, ca := range categories {
+		categoryMap[ca.ID] = *ca
+	}
+
+	var responseNews []*domain.NewsResponse
+
+	for _, news := range lastedNews {
+		var images []domain.UploadFileResponseHomePage
+		for _, imgID := range news.Image {
+			if img, ok := uploadFileMap[imgID]; ok {
+				images = append(images, img)
+			}
+		}
+
+		var categoryResponse domain.CategoryResponse
+		if news.CategoryID != "" {
+			if cat, ok := categoryMap[news.CategoryID]; ok {
+				categoryResponse = cat
+			}
+		}
+
+		resp := &domain.NewsResponse{
+			ID:          news.ID,
+			Title:       news.Title,
+			Description: news.Description,
+			Content:     news.Content,
+			Image:       images,
+			CategoryID:  categoryResponse,
+			Tag:         news.Tag,
+			Status:      news.Status,
+			ContentType: news.ContentType,
+			CreatedAt:   news.CreatedAt,
+			UpdatedAt:   news.UpdatedAt,
+		}
+		responseNews = append(responseNews, resp)
+	}
+
+	for _, item := range responseNews {
 		for j, img := range item.Image {
 			item.Image[j].Path = utils.AttachBaseURLToImage(img.Filetype, img.Path)
 		}
 	}
 
-	return news, nil
+	return responseNews, nil
 }
 
-func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.HomePageLastedNewResponse, error) {
+func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponse, error) {
 	news, err := n.newRepo.GetTechnologyNews()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, item := range news {
+	imageIDMap := make(map[string]struct{})
+	categoryIDMap := make(map[string]struct{})
+
+	for _, news := range news {
+		for _, imgID := range news.Image {
+			imageIDMap[imgID] = struct{}{}
+		}
+		if news.CategoryID != "" {
+			categoryIDMap[news.CategoryID] = struct{}{}
+		}
+	}
+
+	imageIDs := keysFromMap(imageIDMap)
+	categoryIDs := keysFromMap(categoryIDMap)
+
+	uploadFiles, err := n.fileRepo.GetFilesByIDs(imageIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	categories, err := n.categoryService.GetByIDs(categoryIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	uploadFileMap := make(map[string]domain.UploadFileResponseHomePage)
+	for _, f := range uploadFiles {
+		uploadFileMap[f.ID] = domain.UploadFileResponseHomePage{
+			ID:       f.ID,
+			Path:     f.Path,
+			Filetype: f.FileType,
+		}
+	}
+
+	categoryMap := make(map[string]domain.CategoryResponse)
+	for _, ca := range categories {
+		categoryMap[ca.ID] = *ca
+	}
+
+	var responseNews []*domain.NewsResponse
+
+	for _, news := range news {
+		var images []domain.UploadFileResponseHomePage
+		for _, imgID := range news.Image {
+			if img, ok := uploadFileMap[imgID]; ok {
+				images = append(images, img)
+			}
+		}
+
+		var categoryResponse domain.CategoryResponse
+		if news.CategoryID != "" {
+			if cat, ok := categoryMap[news.CategoryID]; ok {
+				categoryResponse = cat
+			}
+		}
+
+		fmt.Printf("categoryResponse: %v\n", categoryResponse.CategoryType)
+
+		resp := &domain.NewsResponse{
+			ID:          news.ID,
+			Title:       news.Title,
+			Description: news.Description,
+			Content:     news.Content,
+			Image:       images,
+			CategoryID:  categoryResponse,
+			Tag:         news.Tag,
+			Status:      news.Status,
+			ContentType: news.ContentType,
+			CreatedAt:   news.CreatedAt,
+			UpdatedAt:   news.UpdatedAt,
+		}
+		responseNews = append(responseNews, resp)
+	}
+
+	for _, item := range responseNews {
 		for j, img := range item.Image {
 			item.Image[j].Path = utils.AttachBaseURLToImage(img.Filetype, img.Path)
 		}
 	}
 
-	return news, nil
+	return responseNews, nil
 }
 
 func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page string) ([]*d.NewsResponse, error) {
@@ -272,10 +418,9 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page string) ([]*d.N
 	}
 
 	if page == "1" {
-		n.cache.Set(ctx, CacheKey, responseNews, 5*time.Minute)
+		err = n.cache.Set(ctx, CacheKey, responseNews, 5*time.Minute)
 		if err != nil {
-			log.Printf("Error setting cache for category %s: %v", CacheKey, err)
-			return nil, err
+			return nil, fmt.Errorf("error setting cache for category %s: %v", CacheKey, err)
 		}
 	}
 
@@ -341,86 +486,90 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page string) ([]*d.N
 
 // /// Get area ///_
 
-// func (n *NewsServiceImpl) UpdateNews(id string, req *d.UpdateNewsRequestResponse, filename string) error {
+func (n *NewsServiceImpl) UpdateNews(id string, req *d.News) error {
 
-// 	existingNews, err := n.repo.GetNewsByID(id)
-// 	if err != nil {
-// 		return err
-// 	}
+	existingNews, err := n.newRepo.GetNewsByID(id)
+	if err != nil {
+		return err
+	}
 
-// 	// debug ต้องนานดันไป get id cache มาหมดเวลาไป 5 ชม. บ่ได้หยัง //
-// 	fmt.Println("req", filename)
-// 	fmt.Println("existing", existingNews.Image)
+	if req.CategoryID != "" {
+		_, err = n.categoryRepo.GetByID(req.CategoryID)
+		if err != nil {
+			return fmt.Errorf("failed to get category : %w", err)
+		}
+		existingNews.CategoryID = req.CategoryID
+	} else {
+		req.CategoryID = existingNews.CategoryID
+	}
 
-// 	if req.Title != "" {
-// 		existingNews.Title = req.Title
-// 	}
+	if len(req.Image) > 0 {
+		img, err := n.fileRepo.ValidateImageIDs(req.Image)
+		if err != nil {
+			return fmt.Errorf("failed to get image files: %w", err)
+		}
+		existingNews.Image = img
+	} else {
+		req.Image = existingNews.Image
+	}
 
-// 	if req.Abstract != "" {
-// 		existingNews.Abstract = req.Abstract
-// 	}
+	// debug ต้องนานดันไป get id cache มาหมดเวลาไป 5 ชม. บ่ได้หยัง //
+	fmt.Println("existing", existingNews.Image)
 
-// 	if req.Detail != "" {
-// 		existingNews.Detail = req.Detail
-// 	}
+	if req.Title == "" {
+		req.Title = existingNews.Title
+	} else {
+		existingNews.Title = req.Title
+	}
 
-// 	oldImg := existingNews.Image
-// 	if filename != "" {
-// 		existingNews.Image = filename
-// 	}
+	if req.Description == "" {
+		req.Description = existingNews.Description
+	} else {
+		existingNews.Description = req.Description
+	}
 
-// 	if !utils.IsValidContentStatus(req.ContentStatus) {
-// 		return fmt.Errorf("invalid content status")
-// 	}
+	if req.Content == "" {
+		req.Content = existingNews.Content
+	} else {
+		existingNews.Content = req.Content
+	}
 
-// 	if !utils.IsContentType(req.ContentType) {
-// 		return fmt.Errorf("invalid content status")
-// 	}
+	if len(req.Tag) == 0 {
+		req.Tag = existingNews.Tag
+	} else {
+		existingNews.Tag = req.Tag
+	}
 
-// 	if req.Category != "" {
-// 		cat, err := n.categoryRepo.GetByID(req.Category)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		existingNews.CategoryID = cat
-// 	}
+	if !req.Status {
+		req.Status = existingNews.Status
+	} else {
+		existingNews.Status = req.Status
+	}
 
-// 	existingNews.ContentStatus = req.ContentStatus
-// 	existingNews.ContentType = req.ContentType
+	if req.ContentType == "" {
+		req.ContentType = existingNews.ContentType
+	} else {
+		existingNews.ContentType = req.ContentType
+	}
 
-// 	if filename != "" && oldImg != "" && filename != oldImg {
-// 		go func(oldImg string) {
-// 			if err := n.repo.DeleteImg(oldImg); err != nil {
-// 				log.Println("Failed to delete old image during update:", err)
-// 			} else {
-// 				log.Println("Old image deleted:", oldImg)
-// 			}
-// 		}(oldImg)
-// 	}
+	fmt.Printf("req: %v\n", req)
 
-// 	return n.repo.UpdateNews(id, existingNews)
-// }
+	err = n.newRepo.UpdateNews(id, req)
+	if err != nil {
+		return err
+	}
 
-// func (n *NewsServiceImpl) Delete(id string) error {
+	return err
+}
 
-// 	news, err := n.repo.GetNewsByID(id)
-// 	if err != nil {
-// 		return err
-// 	}
+func (n *NewsServiceImpl) Delete(id string) error {
 
-// 	if err := n.repo.Delete(id); err != nil {
-// 		return err
-// 	}
+	if err := n.newRepo.Delete(id); err != nil {
+		return err
+	}
 
-// 	if news.Image != "" {
-// 		err := n.repo.DeleteImg(news.Image)
-// 		if err != nil {
-// 			log.Println("Failed to delete image:", err)
-// 		}
-// 	}
-
-// 	return nil
-// }
+	return nil
+}
 
 // helper func //
 func keysFromMap(m map[string]struct{}) []string {

@@ -9,63 +9,40 @@ import (
 	"backend_tech_movement_hex/internal/core/utils"
 	"fmt"
 	"log"
-	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MongoInfographicRepository struct {
-	collection   *mongo.Collection
-	categoryRepo port.CategoryRepository
-	fileRepo     port.UploadRepository
+	collection *mongo.Collection
 }
 
 func NewInfographicRepositoryMongo(
-	db *mongodb.Database,
-	categoryRepo port.CategoryRepository,
-	fileRepo port.UploadRepository) port.InfographicRepository {
+	db *mongodb.Database) port.InfographicRepository {
 	return &MongoInfographicRepository{
-		collection:   db.Collection("infographic"),
-		categoryRepo: categoryRepo,
-		fileRepo:     fileRepo,
+		collection: db.Collection("infographic"),
 	}
 }
 
-func (ip *MongoInfographicRepository) CreateInfo(info *dif.InfographicRequest) error {
+func (ip *MongoInfographicRepository) CreateInfo(info *dif.Infographic) error {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	Category, err := ip.categoryRepo.GetByID(info.Category)
-	if err != nil {
-		return err
-	}
+	fmt.Printf("Category: %v\n", info.Category)
 
-	fmt.Printf("Category: %v\n", Category)
-
-	File, err := ip.fileRepo.GetFileByID(info.Image)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("File: %v\n", File)
-
-	CateOBJ, err := primitive.ObjectIDFromHex(Category.ID)
+	CateOBJ, err := primitive.ObjectIDFromHex(info.Category)
 	if err != nil {
 		log.Println("err 1 ", err)
 		return err
 	}
 
-	FileOBJ, err := primitive.ObjectIDFromHex(File.ID)
+	FileOBJ, err := primitive.ObjectIDFromHex(info.Image)
 	if err != nil {
 		log.Println("err 2 ", err)
-		return err
-	}
-
-	statusBool, err := strconv.ParseBool(info.Status)
-	if err != nil {
 		return err
 	}
 
@@ -74,7 +51,7 @@ func (ip *MongoInfographicRepository) CreateInfo(info *dif.InfographicRequest) e
 		Image:     FileOBJ,
 		Category:  CateOBJ,
 		Tags:      info.Tags,
-		Status:    statusBool,
+		Status:    info.Status,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -83,64 +60,42 @@ func (ip *MongoInfographicRepository) CreateInfo(info *dif.InfographicRequest) e
 	return err
 }
 
-func (ip *MongoInfographicRepository) GetInfoHome() ([]dif.InfographicRespose, error) {
+func (ip *MongoInfographicRepository) GetInfoHome() ([]*dif.Infographic, error) {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	pipeline := mongo.Pipeline{
-		{{Key: "$match", Value: bson.M{"status": true}}},
-		{{Key: "$sort", Value: bson.D{{Key: "_id", Value: -1}}}},
-		{{Key: "$limit", Value: 6}},
-		{{Key: "$lookup", Value: bson.M{
-			"from":         "file_Upload",
-			"localField":   "image",
-			"foreignField": "_id",
-			"as":           "image_info",
-		}}},
-		{{Key: "$unwind", Value: bson.M{
-			"path":                       "$image_info",
-			"preserveNullAndEmptyArrays": true,
-		}}},
-		{{Key: "$project", Value: bson.M{
-			"_id":        1,
-			"title":      1,
-			"created_at": 1,
-			"image_info": 1,
-		}}},
-	}
+	var results []models.MongoInfographic
 
-	cursor, err := ip.collection.Aggregate(ctx, pipeline)
+	filter := bson.M{}
+	findOptions := options.Find().
+		SetLimit(5).
+		SetSort(bson.D{{Key: "_id", Value: -1}})
+
+	cursor, err := ip.collection.Find(ctx, filter, findOptions)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot aggregate: %s", err)
 	}
 	defer cursor.Close(ctx)
 
-	var results []struct {
-		ID        primitive.ObjectID           `bson:"_id"`
-		Title     string                       `bson:"title"`
-		CreatedAt time.Time                    `bson:"created_at"`
-		ImageInfo models.MongoUploadRepository `bson:"image_info"`
-	}
-
 	if err := cursor.All(ctx, &results); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot cursor info: %s", err)
 	}
 
-	// Map to response
-	response := make([]domain.InfographicRespose, len(results))
-	for i, r := range results {
-		response[i] = domain.InfographicRespose{
-			ID:    r.ID.Hex(),
-			Title: r.Title,
-			Image: domain.UploadFileResponse{
-				ID:       r.ImageInfo.ID.Hex(),
-				Path:     r.ImageInfo.Path,
-				Name:     r.ImageInfo.Name,
-				FileType: r.ImageInfo.FileType,
-			},
-			CreatedAt: utils.ConvertTimeResponse(r.CreatedAt),
-		}
+	var Infographic []*domain.Infographic
+	for _, short := range results {
+
+		Infographic = append(Infographic, &domain.Infographic{
+			ID:        short.ID.Hex(),
+			Title:     short.Title,
+			Category:  short.Category.Hex(),
+			Tags:      short.Tags,
+			Image:     short.Image.Hex(),
+			Status:    short.Status,
+			CreatedAt: short.CreatedAt.String(),
+			UpdatedAt: short.UpdatedAt.String(),
+		})
 	}
 
-	return response, nil
+	fmt.Printf("shortVideos: %v\n", Infographic)
+	return Infographic, nil
 }

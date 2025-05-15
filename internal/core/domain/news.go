@@ -47,17 +47,15 @@ type NewsRequest struct {
 	ContentType string   `form:"content_type" validate:"required,oneof=Global_Tech Local_Tech"`
 }
 
-type UpdateNewsRequestResponse struct {
-	Title         string `json:"title"`
-	Abstract      string `json:"abstract"`
-	Detail        string `json:"detail"`
-	Image         string `json:"image"`
-	Category      string `json:"category"`
-	Tag           string `json:"tag"`
-	Status        string `json:"status"`
-	ContentStatus string `form:"content_status"`
-	ContentType   string `form:"content_type"`
-	UpdatedAt     string `json:"updated_at"`
+type UpdateNewsRequest struct {
+	Title       *string   `json:"title" validate:"required"`
+	Description *string   `json:"description" validate:"required"`
+	Content     *string   `json:"content" validate:"required"`
+	Image       *[]string `json:"news_image" validate:"required"`
+	Category    *string   `json:"category"`
+	Tag         *[]string `json:"tag" validate:"required,min=1,required"`
+	Status      *bool     `json:"status" validate:"required"`
+	ContentType *string   `json:"content_type" form:"content_type" validate:"required,oneof=Global_Tech Local_Tech"`
 }
 
 // News Home::LastedNews//

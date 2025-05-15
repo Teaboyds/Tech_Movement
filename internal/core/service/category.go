@@ -78,8 +78,9 @@ func (cats *CategoryService) GetByIDs(ids []string) ([]*domain.CategoryResponse,
 	var responses []*domain.CategoryResponse
 	for _, category := range Cate {
 		resp := &domain.CategoryResponse{
-			ID:   category.ID,
-			Name: category.Name,
+			ID:           category.ID,
+			Name:         category.Name,
+			CategoryType: category.CategoryType,
 		}
 		responses = append(responses, resp)
 	}

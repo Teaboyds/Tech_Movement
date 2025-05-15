@@ -5,9 +5,9 @@ import (
 )
 
 type MediaRepository interface {
-	CreateMedia(media *domain.MediaRequest) error
-	GetVideoHome(cateId string) ([]*domain.VideoResponse, error)
-	GetShortVideoHome() ([]*domain.ShortVideo, error)
+	CreateMedia(media *domain.Media) error
+	GetVideoHome(cateId string) ([]*domain.Media, error)
+	GetShortVideoHome(cateId string) ([]*domain.Media, error)
 }
 
 type MediaService interface {

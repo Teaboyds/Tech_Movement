@@ -19,7 +19,13 @@ func NewUploadService(UploadRepo port.UploadRepository) port.UploadService {
 
 func (ul *UploadService) UploadFile(file *ul.UploadFileRequest) error {
 
-	err := ul.UploadRepo.SaveImage(file)
+	input := &domain.UploadFile{
+		Path:     file.Path,
+		Name:     file.Name,
+		FileType: file.FileType,
+	}
+
+	err := ul.UploadRepo.SaveImage(input)
 	if err != nil {
 		return err
 	}

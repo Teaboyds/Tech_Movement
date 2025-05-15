@@ -99,8 +99,9 @@ func (cat *MongoCategoryRepository) GetByIDs(ids []string) ([]*domain.Category, 
 	var responses []*domain.Category
 	for _, category := range categories {
 		resp := &domain.Category{
-			ID:   category.ID.Hex(),
-			Name: category.Name,
+			ID:           category.ID.Hex(),
+			Name:         category.Name,
+			CategoryType: category.CategoryType,
 		}
 		responses = append(responses, resp)
 	}

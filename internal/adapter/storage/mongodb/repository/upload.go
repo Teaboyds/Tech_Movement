@@ -41,7 +41,7 @@ func (n *MongoUploadRepository) EnsureFileIndexs() error {
 	return err
 }
 
-func (ul *MongoUploadRepository) SaveImage(file *up.UploadFileRequest) error {
+func (ul *MongoUploadRepository) SaveImage(file *up.UploadFile) error {
 
 	ctx, cancle := utils.NewTimeoutContext()
 	defer cancle()

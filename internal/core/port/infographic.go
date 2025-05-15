@@ -5,11 +5,11 @@ import (
 )
 
 type InfographicRepository interface {
-	CreateInfo(info *dif.InfographicRequest) error
-	GetInfoHome() ([]dif.InfographicRespose, error)
+	CreateInfo(info *dif.Infographic) error
+	GetInfoHome() ([]*dif.Infographic, error)
 }
 
 type InfographicService interface {
 	CreateInfo(info *dif.InfographicRequest) error
-	GetInfoHome() ([]dif.InfographicRespose, error)
+	GetInfoHome() ([]*dif.InfographicRespose, error)
 }

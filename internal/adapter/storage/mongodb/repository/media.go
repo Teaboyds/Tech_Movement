@@ -18,23 +18,21 @@ import (
 )
 
 type MongoMediaRepository struct {
-	db           *mongo.Collection
-	categoryRepo port.CategoryRepository
+	db *mongo.Collection
 }
 
-func NewMediaRepositoryMongo(db *mongodb.Database, categoryRepo port.CategoryRepository) port.MediaRepository {
+func NewMediaRepositoryMongo(db *mongodb.Database) port.MediaRepository {
 	return &MongoMediaRepository{
-		db:           db.Collection("media"),
-		categoryRepo: categoryRepo,
+		db: db.Collection("media"),
 	}
 }
 
-func (med *MongoMediaRepository) CreateMedia(media *domain.MediaRequest) error {
+func (med *MongoMediaRepository) CreateMedia(media *domain.Media) error {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	cateObj, err := primitive.ObjectIDFromHex(media.Category)
+	cateObj, err := primitive.ObjectIDFromHex(media.CategoryID)
 	if err != nil {
 		return fmt.Errorf("cate_obj error in media repo")
 	}
@@ -50,11 +48,14 @@ func (med *MongoMediaRepository) CreateMedia(media *domain.MediaRequest) error {
 	}
 
 	_, err = med.db.InsertOne(ctx, mediaDoc)
+	if err != nil {
+		return fmt.Errorf("cannot save media in mongodb : %s", err)
+	}
 
 	return err
 }
 
-func (med *MongoMediaRepository) GetVideoHome(cateId string) ([]*domain.VideoResponse, error) {
+func (med *MongoMediaRepository) GetVideoHome(cateId string) ([]*domain.Media, error) {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
@@ -65,7 +66,9 @@ func (med *MongoMediaRepository) GetVideoHome(cateId string) ([]*domain.VideoRes
 		return nil, err
 	}
 
-	log.Printf("Excluded category ID: %v (type: %T)", categoryObjectID, categoryObjectID)
+	fmt.Printf("categoryObjectID: %v\n", categoryObjectID)
+
+	var results []models.MongoMedia
 
 	// Define the aggregation pipeline
 	pipeline := mongo.Pipeline{
@@ -77,12 +80,6 @@ func (med *MongoMediaRepository) GetVideoHome(cateId string) ([]*domain.VideoRes
 			{Key: "created_at", Value: -1},
 		}}},
 		{{Key: "$limit", Value: 4}},
-		{{Key: "$group", Value: bson.D{
-			{Key: "_id", Value: "$category_id"},
-			{Key: "news", Value: bson.D{
-				{Key: "$first", Value: "$$ROOT"},
-			}},
-		}}},
 		{{Key: "$lookup", Value: bson.D{
 			{Key: "from", Value: "categories"},
 			{Key: "localField", Value: "_id"},
@@ -95,37 +92,25 @@ func (med *MongoMediaRepository) GetVideoHome(cateId string) ([]*domain.VideoRes
 		}}},
 	}
 
-	// Execute the aggregation pipeline
 	cursor, err := med.db.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	// Prepare the results struct to hold the aggregation response
-	var results []struct {
-		Media    models.MongoMedia    `bson:"news"`
-		Category models.MongoCategory `bson:"category"`
-	}
-
-	// Decode the aggregation results
 	if err := cursor.All(ctx, &results); err != nil {
 		return nil, err
 	}
 
-	var responses []*domain.VideoResponse
+	var responses []*domain.Media
 	for _, result := range results {
-		categoryResp := d.CategoryResponse{
-			ID:   result.Category.ID.Hex(),
-			Name: result.Category.Name,
-		}
 
-		responses = append(responses, &d.VideoResponse{
-			Title:     result.Media.Title,
-			Content:   result.Media.Content,
-			URL:       result.Media.URL,
-			Category:  categoryResp,
-			CreatedAt: utils.ConvertTimeResponse(result.Media.CreatedAt),
+		responses = append(responses, &d.Media{
+			Title:      result.Title,
+			Content:    result.Content,
+			URL:        result.URL,
+			CategoryID: result.CategoryID.Hex(),
+			CreatedAt:  utils.ConvertTimeResponse(result.CreatedAt),
 		})
 	}
 
@@ -134,26 +119,17 @@ func (med *MongoMediaRepository) GetVideoHome(cateId string) ([]*domain.VideoRes
 	return responses, nil
 }
 
-func (med *MongoMediaRepository) GetShortVideoHome() ([]*domain.ShortVideo, error) {
+func (med *MongoMediaRepository) GetShortVideoHome(cateId string) ([]*domain.Media, error) {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	var lastNews []models.MongoMedia
 
-	categories, err := med.categoryRepo.GetByName("Short Video")
-	if err != nil {
-		return nil, fmt.Errorf("error fetching category: %w", err)
-	}
-
-	categoryObjectID, err := primitive.ObjectIDFromHex(categories.ID)
+	categoryObjectID, err := primitive.ObjectIDFromHex(cateId)
 	if err != nil {
 		log.Println("invalid ObjectID from category ID:", err)
 		return nil, err
-	}
-
-	if categories == nil {
-		return nil, fmt.Errorf("category 'short vdo' not found")
 	}
 
 	findOptions := options.Find().
@@ -183,9 +159,9 @@ func (med *MongoMediaRepository) GetShortVideoHome() ([]*domain.ShortVideo, erro
 		log.Printf("Error decoding repo last news: %v", err)
 		return nil, err
 	}
-	var shortVideos []*domain.ShortVideo
+	var shortVideos []*domain.Media
 	for _, media := range lastNews {
-		shortVideos = append(shortVideos, &domain.ShortVideo{
+		shortVideos = append(shortVideos, &domain.Media{
 			Title: media.Title,
 			URL:   media.URL,
 		})
