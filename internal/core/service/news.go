@@ -571,6 +571,15 @@ func (n *NewsServiceImpl) Delete(id string) error {
 	return nil
 }
 
+func (n *NewsServiceImpl) DeleteMany(id []string) error {
+
+	if err := n.newRepo.DeleteMany(id); err != nil {
+		return fmt.Errorf("cannot delete News: %s", err)
+	}
+
+	return nil
+}
+
 // helper func //
 func keysFromMap(m map[string]struct{}) []string {
 	keys := make([]string, 0, len(m))

@@ -338,3 +338,40 @@ func (h *NewsHandler) DeleteNews(c *fiber.Ctx) error {
 	})
 
 }
+
+func (h *NewsHandler) DeleteManyNews(c *fiber.Ctx) error {
+
+	var news domain.DeleteManyID
+
+	if err := c.BodyParser(&news); err != nil {
+		log.Printf("news ID bad request %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrResponse{
+			Error: "Invalid News ID Reuquest",
+		})
+	}
+
+	fmt.Printf("news: %v\n", news)
+
+	fieldMap := map[string]string{
+		"ids": "IDs",
+	}
+
+	if err := utils.FixMultipartArrayV2(c, &news, fieldMap); err != nil {
+		log.Printf("fix multipart array error: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrResponse{
+			Error: "Invalid Form Array Field",
+		})
+	}
+
+	if err := h.service.DeleteMany(news.IDs); err != nil {
+		log.Println(err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Cannot Delete News cause Internal Server Error ",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "News Delete Successfully",
+		"news":    news.IDs,
+	})
+}

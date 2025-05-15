@@ -12,6 +12,7 @@ type NewsRepository interface {
 	// GetNewsByTags(name string) ([]d.News, error)
 	UpdateNews(id string, news *d.News) error
 	Delete(id string) error
+	DeleteMany(id []string) error
 	EnsureNewsIndexs() error
 	Find(catID, ConType, Sort string, limit, page int64) ([]*d.News, error)
 }
@@ -23,5 +24,6 @@ type NewsService interface {
 	GetTechnologyNews() ([]*d.NewsResponse, error)
 	UpdateNews(id string, req *d.News) error
 	Delete(id string) error
+	DeleteMany(id []string) error
 	Find(catID, ConType, Sort, limit, page string) ([]*d.NewsResponse, error)
 }

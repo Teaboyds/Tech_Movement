@@ -347,6 +347,34 @@ func (n *MongoNewsRepository) Delete(id string) error {
 	return nil
 }
 
+func (n *MongoNewsRepository) DeleteMany(id []string) error {
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	var objIDs []primitive.ObjectID
+	for _, id := range id {
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return fmt.Errorf("invalid image ID format: %w", err)
+		}
+		objIDs = append(objIDs, objID)
+	}
+
+	filter := bson.M{"_id": bson.M{"$in": objIDs}}
+
+	results, err := n.collection.DeleteMany(ctx, filter)
+	if err != nil {
+		return fmt.Errorf("cannot delete news")
+	}
+
+	if results.DeletedCount == 0 {
+		log.Printf("No news found with ID: %s", id)
+		return errors.New("news not found or already deleted")
+	}
+
+	return nil
+}
+
 // func (n *MongoCategoryRepository) GetNewsByTags(name string) ([]d.News, error) {
 
 // 	var news []d.News

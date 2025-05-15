@@ -51,6 +51,7 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			// news.Get("/byCategory/:id", p.NewsHandler.GetNewsByCategory)
 			news.Put("/:id", p.NewsHandler.UpdateNews)
 			news.Delete("/:id", p.NewsHandler.DeleteNews)
+			news.Delete("/", p.NewsHandler.DeleteManyNews)
 		}
 
 		category := v1.Group("/category")

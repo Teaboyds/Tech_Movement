@@ -82,4 +82,8 @@ type ErrResponse struct {
 	Error string `json:"error"`
 }
 
+type DeleteManyID struct {
+	IDs []string `json:"ids"`
+}
+
 ////////////////////////////////// Response Models /////////////////////////////////////////////////
