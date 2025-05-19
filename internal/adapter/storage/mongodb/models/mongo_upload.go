@@ -11,6 +11,7 @@ type MongoUploadRepository struct {
 	Path      string             `bson:"path"`
 	Name      string             `bson:"name"`
 	FileType  string             `bson:"file_type"`
+	Type      string             `bson:"type"`
 	CreatedAt time.Time          `bson:"created_at"`
 	UpdatedAt time.Time          `bson:"updated_at"`
 }

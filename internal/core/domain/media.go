@@ -4,19 +4,24 @@ type Media struct {
 	ID         string
 	Title      string
 	Content    string
-	URL        string
+	VideoURL   string
+	ThumnailID string
 	CategoryID string
-	Status     bool
+	Tags       []string
+	View       string
+	Action     string
 	CreatedAt  string
 	UpdatedAt  string
 }
 
 type MediaRequest struct {
-	Title    string `json:"title"`
-	Content  string `json:"content"`
-	URL      string `json:"url"`
-	Category string `json:"category_id"`
-	Status   bool   `json:"status"`
+	Title      string   `json:"title" form:"title"`
+	Content    string   `json:"content" form:"content"`
+	VideoURL   string   `json:"video_url" form:"video_url"`
+	ThumnailID string   `json:"thumnail_id" form:"thumnail_id"`
+	CategoryID string   `json:"category_id"  form:"category_id"`
+	Tags       []string `json:"tags" form:"tags"`
+	Action     string   `json:"action" form:"action"`
 }
 
 type VideoResponse struct {

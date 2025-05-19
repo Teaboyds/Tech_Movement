@@ -11,7 +11,7 @@ type MediaRepository interface {
 }
 
 type MediaService interface {
-	CreateMedia(media *domain.MediaRequest) error
+	CreateMedia(media *domain.Media) error
 	GetVideoHome() ([]*domain.VideoResponse, error)
 	GetShortVideoHome() ([]*domain.ShortVideo, error)
 }

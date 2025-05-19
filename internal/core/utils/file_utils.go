@@ -15,6 +15,7 @@ import (
 type UploadedFile struct {
 	OriginalName string // ชื่อไฟล์เดิม
 	SavedName    string // ชื่อ UUID ที่บันทึกลง disk
+	Type         string // นามสกุลไฟล์
 }
 
 func UploadFile(c *fiber.Ctx, fieldName string, maxSize int64, uploadDir string) (*UploadedFile, error) {
@@ -62,6 +63,7 @@ func UploadFile(c *fiber.Ctx, fieldName string, maxSize int64, uploadDir string)
 	return &UploadedFile{
 		OriginalName: originalName,
 		SavedName:    newFileName,
+		Type:         ext,
 	}, nil
 }
 

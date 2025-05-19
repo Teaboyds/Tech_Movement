@@ -108,31 +108,35 @@ func (n *NewsServiceImpl) GetNewsByID(id string) (*d.NewsResponse, error) {
 
 	thumnail, err := n.fileService.GetFileByID(news.ThumnailID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot fecth thumnail data in Find func : %v", err)
 	}
 
 	// ดึงข้อมูลไฟล์จาก FileRepo (ดึงข้อมูลไฟล์ที่มี ID)
 	uploadFiles, err := n.fileService.GetFilesByIDsVTest(news.ImageIDs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot fecth img data in Find func : %v", err)
 	}
 
 	// แปลง type
-	var fileValues []domain.UploadFileResponseHomePage
+	var fileValues []domain.UploadFileResponse
 	for _, f := range uploadFiles {
 		if f != nil {
-			fileValues = append(fileValues, domain.UploadFileResponseHomePage{
+			fileValues = append(fileValues, domain.UploadFileResponse{
 				ID:       f.ID,
+				Name:     f.Name,
 				Path:     f.Path,
 				FileType: f.FileType,
+				Type:     f.Type,
 			})
 		}
 	}
 
-	thumnailDto := &domain.UploadFileResponseHomePage{
+	thumnailDto := &domain.UploadFileResponse{
 		ID:       thumnail.ID,
+		Name:     thumnail.Name,
 		Path:     thumnail.Path,
 		FileType: thumnail.FileType,
+		Type:     thumnail.Type,
 	}
 
 	response := &domain.NewsResponse{
@@ -189,12 +193,14 @@ func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponseV2, error) {
 		return nil, err
 	}
 
-	thumnailMap := make(map[string]domain.UploadFileResponseHomePage)
+	thumnailMap := make(map[string]domain.UploadFileResponse)
 	for _, t := range thumnail {
-		thumnailMap[t.ID] = d.UploadFileResponseHomePage{
+		thumnailMap[t.ID] = d.UploadFileResponse{
 			ID:       t.ID,
+			Name:     t.Name,
 			Path:     t.Path,
 			FileType: t.FileType,
+			Type:     t.Type,
 		}
 	}
 
@@ -214,7 +220,7 @@ func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponseV2, error) {
 			}
 		}
 
-		var thumnailResponse domain.UploadFileResponseHomePage
+		var thumnailResponse domain.UploadFileResponse
 		if news.ThumnailID != "" {
 			if thum, ok := thumnailMap[news.ThumnailID]; ok {
 				thumnailResponse = thum
@@ -272,12 +278,14 @@ func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponseV2, error) {
 		return nil, err
 	}
 
-	thumnailMap := make(map[string]domain.UploadFileResponseHomePage)
+	thumnailMap := make(map[string]domain.UploadFileResponse)
 	for _, t := range thumnail {
-		thumnailMap[t.ID] = d.UploadFileResponseHomePage{
+		thumnailMap[t.ID] = d.UploadFileResponse{
 			ID:       t.ID,
+			Name:     t.Name,
 			Path:     t.Path,
 			FileType: t.FileType,
+			Type:     t.Type,
 		}
 	}
 
@@ -297,7 +305,7 @@ func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponseV2, error) {
 			}
 		}
 
-		var thumnailResponse domain.UploadFileResponseHomePage
+		var thumnailResponse domain.UploadFileResponse
 		if news.ThumnailID != "" {
 			if thum, ok := thumnailMap[news.ThumnailID]; ok {
 				thumnailResponse = thum
@@ -324,17 +332,21 @@ func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponseV2, error) {
 }
 
 // เอาไว้ query หน้า
-func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page, status, view string) ([]*d.NewsResponseV2, error) {
+func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page, status, view, search string) ([]*d.NewsResponseV2, error) {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
+
+	if page == "" {
+		page = "1"
+	}
 
 	Sort = strings.ToLower(Sort)
 	view = strings.ToLower(view)
 
 	if Sort == "" {
 
-	} else if Sort != "asc" && Sort != "desc" {
+	} else if Sort != "newest" && Sort != "lowest" {
 		return nil, fmt.Errorf("sort must be 'asc' or 'desc'")
 	}
 
@@ -362,7 +374,7 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page, status, view s
 	}
 
 	// cache area //
-	if page == "1" {
+	if page == "1" && search == "" {
 		var cacheNewsCategory []*d.NewsResponseV2
 		err = n.cache.Get(ctx, CacheKey, &cacheNewsCategory)
 		if err == nil && len(cacheNewsCategory) > 0 {
@@ -373,7 +385,7 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page, status, view s
 		log.Println("Cache Miss:", CacheKey)
 	}
 
-	findingNemo, err := n.newRepo.Find(catID, ConType, Sort, status, view, parseLimit, parsePage)
+	findingNemo, err := n.newRepo.Find(catID, ConType, Sort, status, view, search, parseLimit, parsePage)
 	if err != nil {
 		return nil, err
 	}
@@ -392,12 +404,14 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page, status, view s
 	thumbnails, _ := n.fileService.GetFilesByIDsVTest(thumbIDs)
 	categories, _ := n.categoryService.GetByIDs(catIDs)
 
-	thumbMap := make(map[string]domain.UploadFileResponseHomePage)
+	thumbMap := make(map[string]domain.UploadFileResponse)
 	for _, t := range thumbnails {
-		thumbMap[t.ID] = domain.UploadFileResponseHomePage{
+		thumbMap[t.ID] = domain.UploadFileResponse{
 			ID:       t.ID,
+			Name:     t.Name,
 			Path:     t.Path,
 			FileType: t.FileType,
+			Type:     t.Type,
 		}
 	}
 
@@ -429,7 +443,7 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page, status, view s
 		result = append(result, resp)
 	}
 
-	if page == "1" {
+	if page == "1" && search == "" {
 		err = n.cache.Set(ctx, CacheKey, result, 5*time.Minute)
 		if err != nil {
 			return nil, fmt.Errorf("error setting cache for category %s: %v", CacheKey, err)

@@ -7,6 +7,7 @@ import (
 	"backend_tech_movement_hex/internal/core/utils"
 	"fmt"
 	"log"
+	"strings"
 )
 
 type UploadService struct {
@@ -20,10 +21,14 @@ func NewUploadService(UploadRepo port.UploadRepository) port.UploadService {
 // upload ภาพ //
 func (ul *UploadService) UploadFile(file *ul.UploadFileRequest) error {
 
+	namskun := strings.TrimPrefix(file.Type, ".")
+	alt := strings.ReplaceAll(file.Name, " ", "_")
+
 	input := &domain.UploadFile{
 		Path:     file.Path,
-		Name:     file.Name,
+		Name:     alt,
 		FileType: file.FileType,
+		Type:     namskun,
 	}
 
 	err := ul.UploadRepo.SaveImage(input)

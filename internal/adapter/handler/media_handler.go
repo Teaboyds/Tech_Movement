@@ -3,9 +3,7 @@ package handler
 import (
 	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
-	"backend_tech_movement_hex/internal/core/utils"
 	"fmt"
-	"log"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -26,16 +24,17 @@ func (m *MediaHandler) CreateMedia(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Media input"})
 	}
 
-	if err := utils.FixMediaMultipart(c, media); err != nil {
-		log.Printf("fix multipart array error: %v", err)
-		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrResponse{
-			Error: "Invalid Form Array Field",
-		})
+	req := &domain.Media{
+		Title:      media.Title,
+		Content:    media.Content,
+		VideoURL:   media.VideoURL,
+		ThumnailID: media.ThumnailID,
+		CategoryID: media.CategoryID,
+		Tags:       media.Tags,
+		Action:     media.Action,
 	}
 
-	fmt.Printf("media: %v\n", media)
-
-	if err := m.MediaService.CreateMedia(media); err != nil {
+	if err := m.MediaService.CreateMedia(req); err != nil {
 		fmt.Printf("err: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to create media ",

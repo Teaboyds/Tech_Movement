@@ -25,32 +25,32 @@ type News struct {
 ////////////////////////////////// Response // Request // Models /////////////////////////////////////////////////
 
 type NewsResponse struct {
-	ID          string                       `json:"id"`
-	ThumnailID  UploadFileResponseHomePage   `json:"thumnail_id"`
-	Title       string                       `json:"title"`
-	Description string                       `json:"description"`
-	Content     string                       `json:"content"`
-	ImageIDs    []UploadFileResponseHomePage `json:"image_ids"`
-	CategoryID  CategoryResponse             `json:"category_id"`
-	Tags        []string                     `json:"tag"`
-	Status      string                       `json:"status"`
-	ContentType string                       `json:"content_type"`
-	CreatedAt   string                       `json:"created_at"`
-	UpdatedAt   string                       `json:"updated_at"`
+	ID          string               `json:"id"`
+	ThumnailID  UploadFileResponse   `json:"thumnail_id"`
+	Title       string               `json:"title"`
+	Description string               `json:"description"`
+	Content     string               `json:"content"`
+	ImageIDs    []UploadFileResponse `json:"image_ids"`
+	CategoryID  CategoryResponse     `json:"category_id"`
+	Tags        []string             `json:"tag"`
+	Status      string               `json:"status"`
+	ContentType string               `json:"content_type"`
+	CreatedAt   string               `json:"created_at"`
+	UpdatedAt   string               `json:"updated_at"`
 }
 
 type NewsResponseV2 struct {
-	ID          string                     `json:"id"`
-	ThumnailID  UploadFileResponseHomePage `json:"thumnail_id"`
-	Title       string                     `json:"title"`
-	Description string                     `json:"description"`
-	Content     string                     `json:"content"`
-	CategoryID  CategoryResponse           `json:"category_id"`
-	Tags        []string                   `json:"tag"`
-	Status      string                     `json:"status"`
-	ContentType string                     `json:"content_type"`
-	View        string                     `json:"view"`
-	CreatedAt   string                     `json:"created_at"`
+	ID          string             `json:"id"`
+	ThumnailID  UploadFileResponse `json:"thumnail_id"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Content     string             `json:"content"`
+	CategoryID  CategoryResponse   `json:"category_id"`
+	Tags        []string           `json:"tag"`
+	Status      string             `json:"status"`
+	ContentType string             `json:"content_type"`
+	View        string             `json:"view"`
+	CreatedAt   string             `json:"created_at"`
 }
 
 type NewsRequest struct {
@@ -78,12 +78,12 @@ type UpdateNewsRequest struct {
 
 // News Home::LastedNews//
 type HomePageLastedNewResponse struct {
-	Title       string                       `json:"title"`
-	Detail      string                       `json:"detail"`
-	Image       []UploadFileResponseHomePage `json:"image"`
-	Category    CategoryResponse             `json:"category"`
-	ContentType string                       `json:"content_type"`
-	CreatedAt   time.Time                    `json:"created_at"`
+	Title       string               `json:"title"`
+	Detail      string               `json:"detail"`
+	Image       []UploadFileResponse `json:"image"`
+	Category    CategoryResponse     `json:"category"`
+	ContentType string               `json:"content_type"`
+	CreatedAt   time.Time            `json:"created_at"`
 }
 
 // landing page //

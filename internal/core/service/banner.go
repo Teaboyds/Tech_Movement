@@ -72,7 +72,9 @@ func (ban *BannerService) GetBanner(id string) (*domain.BannerClient, error) {
 		images = append(images, domain.UploadFileResponse{
 			ID:       file.ID,
 			Path:     file.Path,
+			Name:     file.Name,
 			FileType: file.FileType,
+			Type:     file.Type,
 		})
 	}
 
@@ -126,7 +128,9 @@ func (ban *BannerService) GetBanners() ([]*domain.BannerClient, error) {
 		uploadFileMap[f.ID] = domain.UploadFileResponse{
 			ID:       f.ID,
 			Path:     f.Path,
+			Name:     f.Name,
 			FileType: f.FileType,
+			Type:     f.Type,
 		}
 	}
 

@@ -45,6 +45,7 @@ func (ul *UploadHandler) UploadFile(c *fiber.Ctx) error {
 
 	file.Name = result.OriginalName
 	file.Path = result.SavedName
+	file.Type = result.Type
 
 	if err := ul.uploadService.UploadFile(&file); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})

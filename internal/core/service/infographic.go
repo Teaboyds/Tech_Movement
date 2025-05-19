@@ -74,6 +74,7 @@ func (ip *InfographicService) GetInfoHome() ([]*domain.InfographicRespose, error
 			Path:     uploadFile.Path,
 			Name:     uploadFile.Name,
 			FileType: uploadFile.FileType,
+			Type:     uploadFile.Type,
 		}
 
 		fmt.Printf("image.FileType: %v\n", image.FileType)

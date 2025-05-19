@@ -51,6 +51,7 @@ func (ul *MongoUploadRepository) SaveImage(file *up.UploadFile) error {
 		Path:      file.Path,
 		Name:      file.Name,
 		FileType:  file.FileType,
+		Type:      file.Type,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -80,12 +81,16 @@ func (ul *MongoUploadRepository) GetFileByID(id string) (*up.UploadFile, error) 
 	}
 
 	response := &domain.UploadFile{
-		ID:       file.ID.Hex(),
-		Path:     file.Path,
-		Name:     file.Name,
-		FileType: file.FileType,
+		ID:        file.ID.Hex(),
+		Path:      file.Path,
+		Name:      file.Name,
+		FileType:  file.FileType,
+		Type:      file.Type,
+		CreatedAt: file.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: file.UpdatedAt.Format(time.RFC3339),
 	}
 
+	fmt.Printf("response: %v\n", response)
 	return response, nil
 }
 
@@ -171,6 +176,7 @@ func (ul *MongoUploadRepository) GetAllFile() ([]up.UploadFile, error) {
 			Path:      c.Path,
 			Name:      c.Name,
 			FileType:  c.FileType,
+			Type:      c.Type,
 			CreatedAt: c.CreatedAt.In(time.FixedZone("UTC+7", 7*60*60)).Format("2006-01-02 15:04:05"),
 			UpdatedAt: c.UpdatedAt.In(time.FixedZone("UTC+7", 7*60*60)).Format("2006-01-02 15:04:05"),
 		}

@@ -3,12 +3,14 @@ package repository
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb/models"
+	mongoUtils "backend_tech_movement_hex/internal/adapter/storage/mongodb/utils"
 	"backend_tech_movement_hex/internal/core/domain"
 	d "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -34,15 +36,28 @@ func (med *MongoMediaRepository) CreateMedia(media *domain.Media) error {
 
 	cateObj, err := primitive.ObjectIDFromHex(media.CategoryID)
 	if err != nil {
-		return fmt.Errorf("cate_obj error in media repo")
+		return fmt.Errorf("cate_obj error in media repo:%v", err)
+	}
+
+	thumObj, err := mongoUtils.ConvertStringToObjectID(media.ThumnailID)
+	if err != nil {
+		return fmt.Errorf("cate_obj error in media repo:%v", err)
+	}
+
+	parseView, err := strconv.Atoi(media.View)
+	if err != nil {
+		return err
 	}
 
 	mediaDoc := &models.MongoMedia{
 		Title:      media.Title,
 		Content:    media.Content,
-		URL:        media.URL,
+		VideoUrl:   media.VideoURL,
+		ThumnailID: thumObj,
 		CategoryID: cateObj,
-		Status:     media.Status,
+		Tags:       media.Tags,
+		View:       parseView,
+		Action:     media.Action,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -108,7 +123,7 @@ func (med *MongoMediaRepository) GetVideoHome(cateId string) ([]*domain.Media, e
 		responses = append(responses, &d.Media{
 			Title:      result.Title,
 			Content:    result.Content,
-			URL:        result.URL,
+			VideoURL:   result.VideoUrl,
 			CategoryID: result.CategoryID.Hex(),
 			CreatedAt:  utils.ConvertTimeResponse(result.CreatedAt),
 		})
@@ -162,8 +177,8 @@ func (med *MongoMediaRepository) GetShortVideoHome(cateId string) ([]*domain.Med
 	var shortVideos []*domain.Media
 	for _, media := range lastNews {
 		shortVideos = append(shortVideos, &domain.Media{
-			Title: media.Title,
-			URL:   media.URL,
+			Title:    media.Title,
+			VideoURL: media.VideoUrl,
 		})
 	}
 

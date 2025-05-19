@@ -60,7 +60,7 @@ func Init(config *config.Container) {
 
 	// Media //
 	mediaRepo := repository.NewMediaRepositoryMongo(db)
-	mediaService := service.NewMediaService(mediaRepo, categoryRepo, categoryService)
+	mediaService := service.NewMediaService(mediaRepo, categoryRepo, categoryService, uploadServiec)
 	mediaHandler := handler.NewMediaHandler(mediaService)
 
 	// InfoGraphic //

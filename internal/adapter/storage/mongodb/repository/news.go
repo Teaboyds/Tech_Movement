@@ -74,6 +74,8 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 		return nil, err
 	}
 
+	fmt.Printf("objID: %v\n", objID)
+
 	var mongoNews models.MongoNews
 	err = n.collection.FindOne(ctx, bson.M{"_id": objID}).Decode(&mongoNews)
 	if err != nil {
@@ -240,7 +242,7 @@ func (n *MongoNewsRepository) GetTechnologyNews() ([]*d.News, error) {
 	return responseNews, nil
 }
 
-func (n *MongoNewsRepository) Find(catID, ConType, Sort, status, view string, limit, page int64) ([]*d.News, error) {
+func (n *MongoNewsRepository) Find(catID, ConType, Sort, status, view, search string, limit, page int64) ([]*d.News, error) {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
@@ -254,6 +256,13 @@ func (n *MongoNewsRepository) Find(catID, ConType, Sort, status, view string, li
 			return nil, fmt.Errorf("invalid category ID: %w", err)
 		}
 		Finder["category_id"] = objID
+	}
+
+	if search != "" {
+		Finder["$or"] = bson.A{
+			bson.M{"title": bson.M{"$regex": search, "$options": "i"}},
+			bson.M{"description": bson.M{"$regex": search, "$options": "i"}},
+		}
 	}
 
 	if ConType != "" {
@@ -270,9 +279,9 @@ func (n *MongoNewsRepository) Find(catID, ConType, Sort, status, view string, li
 
 	opts := options.Find()
 
-	if Sort == "asc" {
+	if Sort == "newest" {
 		opts.SetSort(bson.D{{Key: "created_at", Value: 1}})
-	} else if Sort == "desc" {
+	} else if Sort == "lowest" {
 		opts.SetSort(bson.D{{Key: "created_at", Value: -1}})
 	}
 

@@ -59,7 +59,7 @@ func FixMediaMultipart(c *fiber.Ctx, input *domain.MediaRequest) error {
 	}
 
 	if catID, ok := form.Value["category_id"]; ok && len(catID) > 0 {
-		input.Category = catID[0]
+		input.CategoryID = catID[0]
 	}
 
 	return nil

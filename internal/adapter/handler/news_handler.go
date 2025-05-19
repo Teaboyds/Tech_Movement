@@ -115,8 +115,9 @@ func (h *NewsHandler) Find(c *fiber.Ctx) error {
 	page := find["page"]
 	status := find["status"]
 	view := find["view"]
+	search := find["search"]
 
-	findingNemo, err := h.service.Find(catId, conType, sort, limit, page, status, view)
+	findingNemo, err := h.service.Find(catId, conType, sort, limit, page, status, view, search)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),

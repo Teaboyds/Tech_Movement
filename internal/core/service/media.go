@@ -3,41 +3,58 @@ package service
 import (
 	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
+	"backend_tech_movement_hex/internal/core/utils"
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 )
 
 type MediaService struct {
 	MediaRepo       port.MediaRepository
 	categoryRepo    port.CategoryRepository
 	categoryService port.CategoryService
+	fileService     port.UploadService
 }
 
-func NewMediaService(MediaRepo port.MediaRepository, categoryRepo port.CategoryRepository, categoryService port.CategoryService) port.MediaService {
-	return &MediaService{MediaRepo: MediaRepo, categoryRepo: categoryRepo, categoryService: categoryService}
+func NewMediaService(MediaRepo port.MediaRepository, categoryRepo port.CategoryRepository, categoryService port.CategoryService, fileService port.UploadService) port.MediaService {
+	return &MediaService{MediaRepo: MediaRepo, categoryRepo: categoryRepo, categoryService: categoryService, fileService: fileService}
 }
 
-func (med *MediaService) CreateMedia(media *domain.MediaRequest) error {
+func (med *MediaService) CreateMedia(media *domain.Media) error {
 
-	if media.Category == "" {
+	if media.CategoryID == "" {
 		return errors.New("missing id in request body")
 	}
 
-	_, err := med.categoryRepo.GetByID(media.Category)
+	if media.View == "" {
+		media.View = "0"
+		_, err := strconv.Atoi(media.View)
+		if err != nil {
+			return fmt.Errorf("failed to parse View: %s", err)
+		}
+	}
+
+	_, err := med.fileService.GetFileByID(media.ThumnailID)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot fecth media thumnail : %v", err)
 	}
 
-	inputMedia := &domain.Media{
-		Title:      media.Title,
-		Content:    media.Content,
-		URL:        media.URL,
-		CategoryID: media.Category,
-		Status:     media.Status,
+	_, err = med.categoryRepo.GetByID(media.CategoryID)
+	if err != nil {
+		return fmt.Errorf("cannot fecth category thumnail :%v", err)
 	}
 
-	err = med.MediaRepo.CreateMedia(inputMedia)
+	if media.Action == "" {
+		media.Action = "On"
+	} else {
+		actionCheck := utils.IsValidAction(media.Action)
+		if actionCheck == false {
+			return fmt.Errorf("action must be 'on' or 'off'")
+		}
+	}
+
+	err = med.MediaRepo.CreateMedia(media)
 	if err != nil {
 		return err
 	}
@@ -96,7 +113,7 @@ func (med *MediaService) GetVideoHome() ([]*domain.VideoResponse, error) {
 		resp := &domain.VideoResponse{
 			Title:    result.Title,
 			Content:  result.Content,
-			URL:      result.URL,
+			URL:      result.VideoURL,
 			Category: categoryResponse,
 		}
 
@@ -125,7 +142,7 @@ func (med *MediaService) GetShortVideoHome() ([]*domain.ShortVideo, error) {
 
 		resp := &domain.ShortVideo{
 			Title: result.Title,
-			URL:   result.URL,
+			URL:   result.VideoURL,
 		}
 
 		responseShort = append(responseShort, resp)
