@@ -1,14 +1,14 @@
 package domain
 
 type Media struct {
-	ID         string `json:"_id,omitempty"`
-	Title      string `json:"title"`
-	Content    string `json:"content"`
-	URL        string `json:"url"`
-	CategoryID string `json:"category_id"`
-	Status     bool   `json:"status"`
-	CreatedAt  string `json:"created_at"`
-	UpdatedAt  string `json:"updated_at"`
+	ID         string
+	Title      string
+	Content    string
+	URL        string
+	CategoryID string
+	Status     bool
+	CreatedAt  string
+	UpdatedAt  string
 }
 
 type MediaRequest struct {

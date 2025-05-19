@@ -17,6 +17,7 @@ func NewUploadService(UploadRepo port.UploadRepository) port.UploadService {
 	return &UploadService{UploadRepo: UploadRepo}
 }
 
+// upload ภาพ //
 func (ul *UploadService) UploadFile(file *ul.UploadFileRequest) error {
 
 	input := &domain.UploadFile{
@@ -33,6 +34,7 @@ func (ul *UploadService) UploadFile(file *ul.UploadFileRequest) error {
 	return nil
 }
 
+// ใช้ Get ตอนต้องการดึงภาพ By ID //
 func (ul *UploadService) GetFileByID(id string) (*ul.UploadFile, error) {
 
 	file, err := ul.UploadRepo.GetFileByID(id)
@@ -45,6 +47,7 @@ func (ul *UploadService) GetFileByID(id string) (*ul.UploadFile, error) {
 	return file, err
 }
 
+// ใช้ดึง file ภาพทั้งหมด //
 func (ul *UploadService) GetAllFile() ([]ul.UploadFile, error) {
 	file, err := ul.UploadRepo.GetAllFile()
 	if err != nil {
@@ -58,6 +61,7 @@ func (ul *UploadService) GetAllFile() ([]ul.UploadFile, error) {
 	return file, nil
 }
 
+// ลบภาพ //
 func (ul *UploadService) DeleteFile(id string) error {
 
 	file, err := ul.UploadRepo.GetFileByID(id)
@@ -83,25 +87,32 @@ func (ul *UploadService) DeleteFile(id string) error {
 	return nil
 }
 
-func (ul *UploadService) GetFilesByIDsVTest(ids []string) ([]ul.UploadFileResponse, error) {
+// ใช้ Get ตอนต้องการดึงข่าวหลายตัว แล้วก็เอาไว้ run id จาก array ที่รับเข้ามาแล้ว returm ส่งออกไปเป็น array //
+func (ul *UploadService) GetFilesByIDsVTest(ids []string) ([]*ul.UploadFile, error) {
 
 	files, err := ul.UploadRepo.GetFilesByIDsVTest(ids)
 	if err != nil {
 		return nil, err
 	}
 
-	var resp []domain.UploadFileResponse
+	var resp []*domain.UploadFile
 	for _, f := range files {
-		resp = append(resp, domain.UploadFileResponse{
-			Path:     f.Path,
+		resp = append(resp, &domain.UploadFile{
+			ID:       f.ID,
 			Name:     f.Name,
+			Path:     f.Path,
 			FileType: f.FileType,
 		})
+	}
+
+	for _, item := range resp {
+		item.Path = utils.AttachBaseURLToImage(item.FileType, item.Path)
 	}
 
 	return resp, nil
 }
 
+// ใช้เช็คว่า []ids มีอยู่ใน database ไหมแล้วคืนไปเป็น []string เช่รเดิม  **อาจจะลบ //
 func (ul *UploadService) ValidateImageIDs(ids []string) ([]string, error) {
 	return ul.UploadRepo.ValidateImageIDs(ids)
 }

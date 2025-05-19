@@ -33,20 +33,14 @@ func (cats *CategoryService) Create(category *domain.Category) error {
 	return nil
 }
 
-func (cats *CategoryService) GetByID(id string) (*domain.CategoryResponse, error) {
+func (cats *CategoryService) GetByID(id string) (*domain.Category, error) {
 
 	category, err := cats.CatRepo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
 
-	CateDTO := &domain.CategoryResponse{
-		ID:           category.ID,
-		Name:         category.Name,
-		CategoryType: category.CategoryType,
-	}
-
-	return CateDTO, nil
+	return category, nil
 }
 
 func (cats *CategoryService) GetAll() ([]domain.CategoryResponse, error) {
@@ -116,5 +110,11 @@ func (cats *CategoryService) UpdateCategory(id string, category *domain.Category
 }
 
 func (cats *CategoryService) DeleteCategory(id string) error {
-	return cats.CatRepo.DeleteCategory(id)
+
+	err := cats.CatRepo.DeleteCategory(id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

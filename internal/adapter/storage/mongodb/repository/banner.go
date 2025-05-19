@@ -77,13 +77,21 @@ func (n *MongoBannerRepository) Retrive(id string) (*domain.Banner, error) {
 		return nil, err
 	}
 
+	var imgOBJ []string
+	for _, ids := range banner.ImageID {
+		imgOBJ = append(imgOBJ, ids.Hex())
+	}
+
 	response := &domain.Banner{
 		ID:          banner.ID.Hex(),
 		Title:       banner.Title,
 		ContentType: banner.ContentType,
 		Status:      banner.Status,
 		Category:    banner.CategoryID.Hex(),
+		Img:         imgOBJ,
 	}
+
+	fmt.Printf("response: %v\n", response)
 
 	return response, nil
 }
@@ -95,7 +103,7 @@ func (n *MongoBannerRepository) Retrives() ([]*domain.Banner, error) {
 
 	findBanner := options.Find().
 		SetLimit(5).
-		SetSort(bson.D{{"created_at", -1}})
+		SetSort(bson.D{{Key: "created_at", Value: -1}})
 
 	filter := bson.M{
 		"status": true,

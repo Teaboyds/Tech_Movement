@@ -72,6 +72,7 @@ func (h *CategoryHandler) GetAllCategory(c *fiber.Ctx) error {
 
 	category, err := h.CategoryService.GetAll()
 	if err != nil {
+		log.Printf("cannot fetch category because: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "cannot fecth category data",
 		})
@@ -113,7 +114,7 @@ func (h *CategoryHandler) DeleteCategory(c *fiber.Ctx) error {
 	if err := h.CategoryService.DeleteCategory(id); err != nil {
 		log.Printf("Error is %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Cannot Delete Category cause Database Issue",
+			"message": err.Error(),
 		})
 	}
 

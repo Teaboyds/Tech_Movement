@@ -11,7 +11,7 @@ type UploadRepository interface {
 	GetFilesByIDs(ids []string) ([]up.UploadFile, error)
 	DeleteFile(id string) error
 	EnsureFileIndexs() error
-	GetFilesByIDsVTest(ids []string) ([]up.UploadFile, error)
+	GetFilesByIDsVTest(ids []string) ([]*up.UploadFile, error)
 }
 
 type UploadService interface {
@@ -20,6 +20,6 @@ type UploadService interface {
 	GetFileByID(id string) (*up.UploadFile, error)
 	GetAllFile() ([]up.UploadFile, error)
 	DeleteFile(id string) error
-	GetFilesByIDsVTest(ids []string) ([]up.UploadFileResponse, error)
+	GetFilesByIDsVTest(ids []string) ([]*up.UploadFile, error)
 	ValidateImageIDs(ids []string) ([]string, error)
 }

@@ -14,16 +14,18 @@ type NewsRepository interface {
 	Delete(id string) error
 	DeleteMany(id []string) error
 	EnsureNewsIndexs() error
-	Find(catID, ConType, Sort string, limit, page int64) ([]*d.News, error)
+	Find(catID, ConType, Sort, status, view string, limit, page int64) ([]*d.News, error)
+	Count(catID, ConType, Status string) (int64, error)
 }
 
 type NewsService interface {
 	CreateNews(news *d.News) error
 	GetNewsByID(id string) (*d.NewsResponse, error)
-	GetLastNews() ([]*d.NewsResponse, error)
-	GetTechnologyNews() ([]*d.NewsResponse, error)
+	GetLastNews() ([]*d.NewsResponseV2, error)
+	GetTechnologyNews() ([]*d.NewsResponseV2, error)
 	UpdateNews(id string, req *d.News) error
 	Delete(id string) error
 	DeleteMany(id []string) error
-	Find(catID, ConType, Sort, limit, page string) ([]*d.NewsResponse, error)
+	Find(catID, ConType, Sort, limit, page, status, view string) ([]*d.NewsResponseV2, error)
+	Count(catID, ConType, Status, limit, page string) (*d.PaginationResp, error)
 }

@@ -86,7 +86,7 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 		{
 			home.Get("/lastedNews", p.NewsHandler.GetLastNews)
 			home.Get("/TechNews", p.NewsHandler.GetTechNews)
-			home.Get("/HomeLander", p.NewsHandler.GetHomePage)
+			home.Get("/", p.NewsHandler.GetHomePage)
 			home.Get("/VDO", p.NewsHandler.GetVideoHome)
 			home.Get("/Short", p.NewsHandler.GetShortVideoHome)
 			home.Get("/Info", p.NewsHandler.GetInfoHome)

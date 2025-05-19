@@ -46,14 +46,18 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := utils.FixMultipartArray(c, &input); err != nil {
+	fieldMap := map[string]string{
+		"image_ids": "ImageIDs",
+	}
+
+	fmt.Printf("fieldMap: %v\n", fieldMap)
+
+	if err := utils.FixMultipartArrayV2(c, &input, fieldMap); err != nil {
 		log.Printf("fix multipart array error: %v", err)
 		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrResponse{
 			Error: "Invalid Form Array Field",
 		})
 	}
-
-	fmt.Printf("input after fix: %+v\n", input)
 
 	if err := utils.ValidateNewsInput(&input); err != nil {
 		log.Printf("news bad validator request: %v", err)
@@ -63,12 +67,13 @@ func (h *NewsHandler) CreateNews(c *fiber.Ctx) error {
 	}
 
 	req := &domain.News{
+		ThumnailID:  input.ThumnailID,
 		Title:       input.Title,
 		Description: input.Description,
 		Content:     input.Content,
-		Image:       input.Image,
-		CategoryID:  input.Category,
-		Tag:         input.Tag,
+		ImageIDs:    input.ImageIDs,
+		CategoryID:  input.CategoryID,
+		Tags:        input.Tags,
 		Status:      input.Status,
 		ContentType: input.ContentType,
 	}
@@ -108,8 +113,17 @@ func (h *NewsHandler) Find(c *fiber.Ctx) error {
 	sort := find["sort"]
 	limit := find["limit"]
 	page := find["page"]
+	status := find["status"]
+	view := find["view"]
 
-	findingNemo, err := h.service.Find(catId, conType, sort, limit, page)
+	findingNemo, err := h.service.Find(catId, conType, sort, limit, page, status, view)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	countNemo, err := h.service.Count(catId, conType, status, limit, page)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
@@ -117,7 +131,9 @@ func (h *NewsHandler) Find(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"data": findingNemo,
+		"message":    "Retrives news",
+		"data":       findingNemo,
+		"pagination": countNemo,
 	})
 }
 
@@ -297,12 +313,13 @@ func (h *NewsHandler) UpdateNews(c *fiber.Ctx) error {
 	}
 
 	newNews := domain.News{
+		ThumnailID:  news.ThumnailID,
 		Title:       news.Title,
 		Description: news.Description,
 		Content:     news.Content,
-		Image:       news.Image,
-		CategoryID:  news.Category,
-		Tag:         news.Tag,
+		ImageIDs:    news.ImageIDs,
+		CategoryID:  news.CategoryID,
+		Tags:        news.Tags,
 		Status:      news.Status,
 		ContentType: news.ContentType,
 		UpdatedAt:   time.Now().Format(time.RFC3339),

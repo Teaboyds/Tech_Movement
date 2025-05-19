@@ -72,8 +72,8 @@ func FixMultipartArray(c *fiber.Ctx, input *domain.NewsRequest) error {
 	}
 
 	// ถ้า form มี field news_image หรือ tag ถึงค่อย override
-	if newsImgs, ok := form.Value["news_image"]; ok {
-		input.Image = newsImgs
+	if newsImgs, ok := form.Value["image_ids"]; ok {
+		input.ImageIDs = newsImgs
 	}
 
 	return nil

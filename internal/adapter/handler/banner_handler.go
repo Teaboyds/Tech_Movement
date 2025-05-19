@@ -68,7 +68,7 @@ func (ban *BannerHandler) GetBanner(c *fiber.Ctx) error {
 	banner, err := ban.bannerService.GetBanner(id)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(domain.ErrResponse{
-			Error: "Category Not Found",
+			Error: "Banner Not Found",
 		})
 	}
 

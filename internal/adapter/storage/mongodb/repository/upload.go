@@ -3,6 +3,7 @@ package repository
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb/models"
+	mongoUtils "backend_tech_movement_hex/internal/adapter/storage/mongodb/utils"
 	"backend_tech_movement_hex/internal/core/domain"
 	up "backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
@@ -223,22 +224,17 @@ func (ul *MongoUploadRepository) DeleteFile(id string) error {
 	return nil
 }
 
-func (ul *MongoUploadRepository) GetFilesByIDsVTest(ids []string) ([]up.UploadFile, error) {
+func (ul *MongoUploadRepository) GetFilesByIDsVTest(ids []string) ([]*up.UploadFile, error) {
 
-	// loop แปลง obj ใน slice //
-	var objIDs []primitive.ObjectID
-	for _, id := range ids {
-		objID, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			return nil, fmt.Errorf("invalid image ID format: %w", err)
-		}
-		objIDs = append(objIDs, objID)
+	obj, err := mongoUtils.ConvertStringToObjectIDArray(ids)
+	if err != nil {
+		return nil, err
 	}
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	filter := bson.M{"_id": objIDs}
+	filter := bson.M{"_id": bson.M{"$in": obj}}
 
 	cursor, err := ul.collection.Find(ctx, filter)
 	if err != nil {
@@ -246,31 +242,25 @@ func (ul *MongoUploadRepository) GetFilesByIDsVTest(ids []string) ([]up.UploadFi
 	}
 	defer cursor.Close(ctx)
 
-	var files []up.UploadFile
+	var files []*up.UploadFile
 	for cursor.Next(ctx) {
 		var file models.MongoUploadRepository
 		if err := cursor.Decode(&file); err != nil {
 			return nil, fmt.Errorf("error decoding file: %w", err)
 		}
-		files = append(files, up.UploadFile{
+		files = append(files, &up.UploadFile{
 			ID:        file.ID.Hex(),
 			Path:      file.Path,
 			Name:      file.Name,
 			FileType:  file.FileType,
-			CreatedAt: time.Now().Local().Format(time.RFC3339),
-			UpdatedAt: time.Now().Local().Format(time.RFC3339),
+			CreatedAt: file.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: file.UpdatedAt.Format(time.RFC3339),
 		})
 	}
 
 	if err := cursor.Err(); err != nil {
 		return nil, fmt.Errorf("cursor error: %w", err)
 	}
-
-	if len(files) != len(ids) {
-		return nil, fmt.Errorf("some image IDs not found in database")
-	}
-
-	fmt.Printf("files: %v\n", files)
 
 	return files, nil
 }

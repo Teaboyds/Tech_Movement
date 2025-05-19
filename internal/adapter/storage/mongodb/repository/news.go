@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -80,20 +81,24 @@ func (n *MongoNewsRepository) GetNewsByID(id string) (*d.News, error) {
 	}
 
 	var imageIDs []string
-	for _, oid := range mongoNews.Image {
+	for _, oid := range mongoNews.ImageIDs {
 		imageIDs = append(imageIDs, oid.Hex())
 	}
 
+	parseView := strconv.Itoa(mongoNews.View)
+
 	response := &domain.News{
 		ID:          mongoNews.ID.Hex(),
+		ThumnailID:  mongoNews.ThumnailID.Hex(),
 		Title:       mongoNews.Title,
 		Description: mongoNews.Description,
 		Content:     mongoNews.Content,
-		Image:       imageIDs,
+		ImageIDs:    imageIDs,
 		CategoryID:  mongoNews.CategoryID.Hex(),
-		Tag:         mongoNews.Tag,
-		Status:      mongoNews.Status,
+		Tags:        mongoNews.Tags,
+		Status:      strconv.FormatBool(mongoNews.Status),
 		ContentType: mongoNews.ContentType,
+		View:        parseView,
 		CreatedAt:   mongoNews.CreatedAt.Format(time.RFC1123),
 		UpdatedAt:   mongoNews.UpdatedAt.Format(time.RFC1123),
 	}
@@ -107,46 +112,53 @@ func (n *MongoNewsRepository) GetLastNews() ([]*d.News, error) {
 
 	var lastNews []models.MongoNews
 
-	findOptions := options.Find().
-		SetLimit(5).
-		SetSort(bson.D{{Key: "_id", Value: -1}})
-
-	filter := bson.M{
-		"status": true,
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{
+			{Key: "status", Value: true},
+		}}},
+		{{Key: "$sort", Value: bson.D{
+			{Key: "created_at", Value: 1},
+		}}},
+		{{Key: "$limit", Value: 5}},
 	}
 
-	cursor, err := n.collection.Find(ctx, filter, findOptions)
+	cursor, err := n.collection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	if err := cursor.All(ctx, &lastNews); err != nil {
-		log.Printf("Error decoding repo last news: %v", err)
 		return nil, err
 	}
 
 	var responseNews []*domain.News
 	for _, news := range lastNews {
-		var imageIDs []string
-		for _, oid := range news.Image {
+		imageIDs := make([]string, 0, len(news.ThumnailID))
+		for _, oid := range news.ImageIDs {
 			imageIDs = append(imageIDs, oid.Hex())
 		}
 
+		parseView := strconv.Itoa(news.View)
+
 		resp := &domain.News{
 			ID:          news.ID.Hex(),
+			ThumnailID:  news.ThumnailID.Hex(),
 			Title:       news.Title,
 			Description: news.Description,
 			Content:     news.Content,
-			Image:       imageIDs,
+			ImageIDs:    imageIDs,
 			CategoryID:  news.CategoryID.Hex(),
-			Tag:         news.Tag,
-			Status:      news.Status,
+			Tags:        news.Tags,
+			Status:      strconv.FormatBool(news.Status),
+			View:        parseView,
 			ContentType: news.ContentType,
-			CreatedAt:   news.CreatedAt.String(),
+			CreatedAt:   news.CreatedAt.Format(time.RFC3339),
 		}
 		responseNews = append(responseNews, resp)
 	}
+
+	fmt.Printf("responseNews Repo: %v\n", responseNews)
 
 	return responseNews, nil
 }
@@ -167,10 +179,24 @@ func (n *MongoNewsRepository) GetTechnologyNews() ([]*d.News, error) {
 			{Key: "foreignField", Value: "_id"},
 			{Key: "as", Value: "category"},
 		}}},
-		{{Key: "$unwind", Value: bson.D{
-			{Key: "path", Value: "$category"},
-			{Key: "preserveNullAndEmptyArrays", Value: true},
+		{{Key: "$unwind", Value: "$category"}},
+		{{Key: "$match", Value: bson.D{
+			{Key: "category.category_type", Value: "news"},
 		}}},
+		{{Key: "$sort", Value: bson.D{
+			{Key: "category_id", Value: 1},
+			{Key: "created_at", Value: -1},
+		}}},
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$category_id"},
+			{Key: "latest_news", Value: bson.D{{Key: "$first", Value: "$$ROOT"}}},
+		}}},
+		{{Key: "$replaceRoot", Value: bson.D{
+			{Key: "newRoot", Value: bson.D{
+				{Key: "$mergeObjects", Value: "$latest_news"},
+			}},
+		}}},
+		{{Key: "$limit", Value: 5}},
 	}
 
 	cursor, err := n.collection.Aggregate(ctx, pipeline)
@@ -183,40 +209,45 @@ func (n *MongoNewsRepository) GetTechnologyNews() ([]*d.News, error) {
 		return nil, err
 	}
 
-	fmt.Printf("lastNews: %v\n", lastNews)
-
-	var responses []*d.News
-	for _, result := range lastNews {
-
-		var imageIDs []string
-		for _, oid := range result.Image {
+	var responseNews []*domain.News
+	for _, news := range lastNews {
+		imageIDs := make([]string, 0, len(news.ThumnailID))
+		for _, oid := range news.ImageIDs {
 			imageIDs = append(imageIDs, oid.Hex())
 		}
 
-		responses = append(responses, &d.News{
-			ID:          result.ID.Hex(),
-			Title:       result.Title,
-			Description: result.Description,
-			Content:     result.Content,
-			Image:       imageIDs,
-			CategoryID:  result.CategoryID.Hex(),
-			Tag:         result.Tag,
-			Status:      result.Status,
-			ContentType: result.ContentType,
-			CreatedAt:   result.CreatedAt.String(),
-		})
+		parseView := strconv.Itoa(news.View)
+
+		resp := &domain.News{
+			ID:          news.ID.Hex(),
+			ThumnailID:  news.ThumnailID.Hex(),
+			Title:       news.Title,
+			Description: news.Description,
+			Content:     news.Content,
+			ImageIDs:    imageIDs,
+			CategoryID:  news.CategoryID.Hex(),
+			Tags:        news.Tags,
+			Status:      strconv.FormatBool(news.Status),
+			View:        parseView,
+			ContentType: news.ContentType,
+			CreatedAt:   news.CreatedAt.Format(time.RFC3339),
+		}
+		responseNews = append(responseNews, resp)
 	}
 
-	return responses, nil
+	fmt.Printf("responseNews Repo: %v\n", responseNews)
+
+	return responseNews, nil
 }
 
-func (n *MongoNewsRepository) Find(catID, ConType, Sort string, limit, page int64) ([]*d.News, error) {
+func (n *MongoNewsRepository) Find(catID, ConType, Sort, status, view string, limit, page int64) ([]*d.News, error) {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	Finder := bson.M{}
 
+	fmt.Printf("status: %v\n", status)
 	if catID != "" {
 		objID, err := mongoUtils.ConvertStringToObjectID(catID)
 		if err != nil {
@@ -229,12 +260,26 @@ func (n *MongoNewsRepository) Find(catID, ConType, Sort string, limit, page int6
 		Finder["content_type"] = ConType
 	}
 
+	if status != "" {
+		tea, err := strconv.ParseBool(status)
+		if err != nil {
+			return nil, fmt.Errorf("input it's not 'true' or 'false'")
+		}
+		Finder["status"] = tea
+	}
+
 	opts := options.Find()
 
 	if Sort == "asc" {
 		opts.SetSort(bson.D{{Key: "created_at", Value: 1}})
 	} else if Sort == "desc" {
 		opts.SetSort(bson.D{{Key: "created_at", Value: -1}})
+	}
+
+	if view == "asc" {
+		opts.SetSort(bson.D{{Key: "view", Value: 1}})
+	} else if view == "desc" {
+		opts.SetSort(bson.D{{Key: "view", Value: -1}})
 	}
 
 	skip := (page - 1) * limit
@@ -254,20 +299,24 @@ func (n *MongoNewsRepository) Find(catID, ConType, Sort string, limit, page int6
 		}
 
 		var imageIDs []string
-		for _, oid := range news.Image {
+		for _, oid := range news.ImageIDs {
 			imageIDs = append(imageIDs, oid.Hex())
 		}
 
+		parseViews := strconv.Itoa(news.View)
+
 		results = append(results, &d.News{
 			ID:          news.ID.Hex(),
+			ThumnailID:  news.ThumnailID.Hex(),
 			Title:       news.Title,
 			Description: news.Description,
 			Content:     news.Content,
-			Image:       imageIDs,
+			ImageIDs:    imageIDs,
 			CategoryID:  news.CategoryID.Hex(),
-			Tag:         news.Tag,
-			Status:      news.Status,
+			Tags:        news.Tags,
+			Status:      strconv.FormatBool(news.Status),
 			ContentType: news.ContentType,
+			View:        parseViews,
 			CreatedAt:   news.CreatedAt.String(),
 			UpdatedAt:   news.UpdatedAt.String(),
 		})
@@ -293,7 +342,7 @@ func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
 	}
 
 	var img []primitive.ObjectID
-	for _, id := range news.Image {
+	for _, id := range news.ImageIDs {
 		objID, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
 			return err
@@ -303,12 +352,13 @@ func (n *MongoNewsRepository) UpdateNews(id string, news *d.News) error {
 
 	update := bson.M{
 		"$set": bson.M{
+			"thumnail_id":  news.ThumnailID,
 			"title":        news.Title,
 			"description":  news.Description,
 			"content":      news.Content,
-			"image":        img,
+			"image_ids":    img,
 			"category_id":  cateOBJ,
-			"tag":          news.Tag,
+			"tags":         news.Tags,
 			"status":       news.Status,
 			"content_type": news.ContentType,
 			"updated_at":   time.Now(),
@@ -373,6 +423,42 @@ func (n *MongoNewsRepository) DeleteMany(id []string) error {
 	}
 
 	return nil
+}
+
+func (n *MongoNewsRepository) Count(catID, ConType, Status string) (int64, error) {
+
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	fmt.Printf("Status: %v\n", Status)
+	finder := bson.M{}
+
+	if catID != "" {
+		objID, err := mongoUtils.ConvertStringToObjectID(catID)
+		if err != nil {
+			return 0, fmt.Errorf("invalid category ID: %w", err)
+		}
+		finder["category_id"] = objID
+	}
+
+	if ConType != "" {
+		finder["content_type"] = ConType
+	}
+
+	if Status != "" {
+		tea, err := strconv.ParseBool(Status)
+		if err != nil {
+			return 0, fmt.Errorf("input it's not 'true' or 'false'")
+		}
+		finder["status"] = tea
+	}
+
+	count, err := n.collection.CountDocuments(ctx, finder)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, err
 }
 
 // func (n *MongoCategoryRepository) GetNewsByTags(name string) ([]d.News, error) {

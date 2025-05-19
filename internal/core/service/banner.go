@@ -55,9 +55,25 @@ func (ban *BannerService) GetBanner(id string) (*domain.BannerClient, error) {
 		return nil, err
 	}
 
+	fmt.Printf("id: %v\n", id)
+
 	cate, err := ban.cateRepo.GetByID(banner.Category)
 	if err != nil {
 		return nil, err
+	}
+
+	uploadFiles, err := ban.uploadRepo.GetFilesByIDs(banner.Img)
+	if err != nil {
+		return nil, err
+	}
+
+	var images []domain.UploadFileResponse
+	for _, file := range uploadFiles {
+		images = append(images, domain.UploadFileResponse{
+			ID:       file.ID,
+			Path:     file.Path,
+			FileType: file.FileType,
+		})
 	}
 
 	blueJeans := &domain.CategoryResponse{
@@ -70,7 +86,10 @@ func (ban *BannerService) GetBanner(id string) (*domain.BannerClient, error) {
 		ContentType: banner.ContentType,
 		Status:      banner.Status,
 		Category:    *blueJeans,
+		Images:      images,
 	}
+
+	fmt.Printf("resp: %v\n", resp)
 
 	return resp, nil
 }

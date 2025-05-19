@@ -7,6 +7,7 @@ import (
 	"backend_tech_movement_hex/internal/core/utils"
 	"fmt"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -17,15 +18,17 @@ type NewsServiceImpl struct {
 	categoryRepo    port.CategoryRepository
 	categoryService port.CategoryService
 	fileRepo        port.UploadRepository
+	fileService     port.UploadService
 	cache           port.CacheRepository
 }
 
-func NewsService(newRepo port.NewsRepository, categoryRepo port.CategoryRepository, cache port.CacheRepository, fileRepo port.UploadRepository, categoryService port.CategoryService) port.NewsService {
+func NewsService(newRepo port.NewsRepository, categoryRepo port.CategoryRepository, cache port.CacheRepository, fileRepo port.UploadRepository, categoryService port.CategoryService, fileService port.UploadService) port.NewsService {
 	return &NewsServiceImpl{
 		newRepo:         newRepo,
 		categoryRepo:    categoryRepo,
 		cache:           cache,
 		fileRepo:        fileRepo,
+		fileService:     fileService,
 		categoryService: categoryService,
 	}
 }
@@ -35,7 +38,12 @@ func (n *NewsServiceImpl) CreateNews(news *d.News) error {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	_, err := n.fileRepo.ValidateImageIDs(news.Image)
+	_, err := n.fileRepo.GetFileByID(news.ThumnailID)
+	if err != nil {
+		return fmt.Errorf("failed to get thumnail files: %s", err)
+	}
+
+	_, err = n.fileRepo.ValidateImageIDs(news.ImageIDs)
 	if err != nil {
 		return fmt.Errorf("failed to get image files: %s", err)
 	}
@@ -45,12 +53,20 @@ func (n *NewsServiceImpl) CreateNews(news *d.News) error {
 		return fmt.Errorf("failed to get category: %s ", err)
 	}
 
-	if len(news.Image) == 0 {
+	if len(news.ImageIDs) == 0 {
 		return fmt.Errorf("no image files found")
 	}
 
-	if len(news.Image) > 3 {
+	if len(news.ImageIDs) > 3 {
 		return fmt.Errorf("cannot attach more than 3 images")
+	}
+
+	if news.View == "" {
+		news.View = "0"
+		_, err := strconv.Atoi(news.View)
+		if err != nil {
+			return fmt.Errorf("failed to parse View: %s", err)
+		}
 	}
 
 	err = n.newRepo.SaveNews(news)
@@ -71,6 +87,7 @@ func (n *NewsServiceImpl) CreateNews(news *d.News) error {
 
 // // / Get area ///
 
+// Get news by id ไว้ใช้หน้าข่าว เดี่ยว ๆ //
 func (n *NewsServiceImpl) GetNewsByID(id string) (*d.NewsResponse, error) {
 
 	news, err := n.newRepo.GetNewsByID(id)
@@ -78,70 +95,91 @@ func (n *NewsServiceImpl) GetNewsByID(id string) (*d.NewsResponse, error) {
 		return nil, err
 	}
 
-	category, err := n.categoryService.GetByID(news.CategoryID)
+	cate, err := n.categoryService.GetByID(news.CategoryID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot fecth category data in Find func : %v", err)
+	}
+
+	categoryResponse := &domain.CategoryResponse{
+		ID:           cate.ID,
+		Name:         cate.Name,
+		CategoryType: cate.CategoryType,
+	}
+
+	thumnail, err := n.fileService.GetFileByID(news.ThumnailID)
 	if err != nil {
 		return nil, err
 	}
 
 	// ดึงข้อมูลไฟล์จาก FileRepo (ดึงข้อมูลไฟล์ที่มี ID)
-	uploadFiles, err := n.fileRepo.GetFilesByIDs(news.Image)
+	uploadFiles, err := n.fileService.GetFilesByIDsVTest(news.ImageIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	var images []domain.UploadFileResponseHomePage
-	for _, file := range uploadFiles {
-		images = append(images, domain.UploadFileResponseHomePage{
-			ID:       file.ID,
-			Path:     file.Path,
-			Filetype: file.FileType,
-		})
+	// แปลง type
+	var fileValues []domain.UploadFileResponseHomePage
+	for _, f := range uploadFiles {
+		if f != nil {
+			fileValues = append(fileValues, domain.UploadFileResponseHomePage{
+				ID:       f.ID,
+				Path:     f.Path,
+				FileType: f.FileType,
+			})
+		}
+	}
+
+	thumnailDto := &domain.UploadFileResponseHomePage{
+		ID:       thumnail.ID,
+		Path:     thumnail.Path,
+		FileType: thumnail.FileType,
 	}
 
 	response := &domain.NewsResponse{
 		ID:          news.ID,
+		ThumnailID:  *thumnailDto,
 		Title:       news.Title,
 		Description: news.Description,
 		Content:     news.Content,
-		Image:       images,    // เติมข้อมูลภาพที่แปลงจาก ID
-		CategoryID:  *category, // เติมข้อมูล Category ที่แปลงจาก ID
-		Tag:         news.Tag,
+		ImageIDs:    fileValues,        // เติมข้อมูลภาพที่แปลงจาก ID
+		CategoryID:  *categoryResponse, // เติมข้อมูล Category ที่แปลงจาก ID
+		Tags:        news.Tags,
 		Status:      news.Status,
 		ContentType: news.ContentType,
 		CreatedAt:   news.CreatedAt,
 		UpdatedAt:   news.UpdatedAt,
 	}
 
-	for i, img := range response.Image {
-		response.Image[i].Path = utils.AttachBaseURLToImage(img.Filetype, img.Path)
+	for i, img := range response.ImageIDs {
+		response.ImageIDs[i].Path = utils.AttachBaseURLToImage(img.FileType, img.Path)
 	}
 
 	return response, nil
 }
 
-func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponse, error) {
-
+// last news หน้า home หรือ หน้า landing page news //
+func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponseV2, error) {
 	lastedNews, err := n.newRepo.GetLastNews()
 	if err != nil {
 		return nil, err
 	}
 
-	imageIDMap := make(map[string]struct{})
 	categoryIDMap := make(map[string]struct{})
+	thumnailIDMap := make(map[string]struct{})
 
 	for _, news := range lastedNews {
-		for _, imgID := range news.Image {
-			imageIDMap[imgID] = struct{}{}
-		}
 		if news.CategoryID != "" {
 			categoryIDMap[news.CategoryID] = struct{}{}
 		}
+		if news.CategoryID != "" {
+			thumnailIDMap[news.ThumnailID] = struct{}{}
+		}
 	}
 
-	imageIDs := keysFromMap(imageIDMap)
 	categoryIDs := keysFromMap(categoryIDMap)
+	thumnailIDs := keysFromMap(thumnailIDMap)
 
-	uploadFiles, err := n.fileRepo.GetFilesByIDs(imageIDs)
+	thumnail, err := n.fileService.GetFilesByIDsVTest(thumnailIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -151,12 +189,12 @@ func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponse, error) {
 		return nil, err
 	}
 
-	uploadFileMap := make(map[string]domain.UploadFileResponseHomePage)
-	for _, f := range uploadFiles {
-		uploadFileMap[f.ID] = domain.UploadFileResponseHomePage{
-			ID:       f.ID,
-			Path:     f.Path,
-			Filetype: f.FileType,
+	thumnailMap := make(map[string]domain.UploadFileResponseHomePage)
+	for _, t := range thumnail {
+		thumnailMap[t.ID] = d.UploadFileResponseHomePage{
+			ID:       t.ID,
+			Path:     t.Path,
+			FileType: t.FileType,
 		}
 	}
 
@@ -165,15 +203,9 @@ func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponse, error) {
 		categoryMap[ca.ID] = *ca
 	}
 
-	var responseNews []*domain.NewsResponse
+	var responseNews []*domain.NewsResponseV2
 
 	for _, news := range lastedNews {
-		var images []domain.UploadFileResponseHomePage
-		for _, imgID := range news.Image {
-			if img, ok := uploadFileMap[imgID]; ok {
-				images = append(images, img)
-			}
-		}
 
 		var categoryResponse domain.CategoryResponse
 		if news.CategoryID != "" {
@@ -182,53 +214,55 @@ func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponse, error) {
 			}
 		}
 
-		resp := &domain.NewsResponse{
+		var thumnailResponse domain.UploadFileResponseHomePage
+		if news.ThumnailID != "" {
+			if thum, ok := thumnailMap[news.ThumnailID]; ok {
+				thumnailResponse = thum
+			}
+		}
+
+		resp := &domain.NewsResponseV2{
 			ID:          news.ID,
+			ThumnailID:  thumnailResponse,
 			Title:       news.Title,
 			Description: news.Description,
 			Content:     news.Content,
-			Image:       images,
 			CategoryID:  categoryResponse,
-			Tag:         news.Tag,
+			Tags:        news.Tags,
 			Status:      news.Status,
 			ContentType: news.ContentType,
+			View:        news.View,
 			CreatedAt:   news.CreatedAt,
-			UpdatedAt:   news.UpdatedAt,
 		}
 		responseNews = append(responseNews, resp)
-	}
-
-	for _, item := range responseNews {
-		for j, img := range item.Image {
-			item.Image[j].Path = utils.AttachBaseURLToImage(img.Filetype, img.Path)
-		}
 	}
 
 	return responseNews, nil
 }
 
-func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponse, error) {
-	news, err := n.newRepo.GetTechnologyNews()
+func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponseV2, error) {
+
+	lastedNews, err := n.newRepo.GetTechnologyNews()
 	if err != nil {
 		return nil, err
 	}
 
-	imageIDMap := make(map[string]struct{})
 	categoryIDMap := make(map[string]struct{})
+	thumnailIDMap := make(map[string]struct{})
 
-	for _, news := range news {
-		for _, imgID := range news.Image {
-			imageIDMap[imgID] = struct{}{}
-		}
+	for _, news := range lastedNews {
 		if news.CategoryID != "" {
 			categoryIDMap[news.CategoryID] = struct{}{}
 		}
+		if news.CategoryID != "" {
+			thumnailIDMap[news.ThumnailID] = struct{}{}
+		}
 	}
 
-	imageIDs := keysFromMap(imageIDMap)
 	categoryIDs := keysFromMap(categoryIDMap)
+	thumnailIDs := keysFromMap(thumnailIDMap)
 
-	uploadFiles, err := n.fileRepo.GetFilesByIDs(imageIDs)
+	thumnail, err := n.fileService.GetFilesByIDsVTest(thumnailIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -238,12 +272,12 @@ func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponse, error) {
 		return nil, err
 	}
 
-	uploadFileMap := make(map[string]domain.UploadFileResponseHomePage)
-	for _, f := range uploadFiles {
-		uploadFileMap[f.ID] = domain.UploadFileResponseHomePage{
-			ID:       f.ID,
-			Path:     f.Path,
-			Filetype: f.FileType,
+	thumnailMap := make(map[string]domain.UploadFileResponseHomePage)
+	for _, t := range thumnail {
+		thumnailMap[t.ID] = d.UploadFileResponseHomePage{
+			ID:       t.ID,
+			Path:     t.Path,
+			FileType: t.FileType,
 		}
 	}
 
@@ -252,15 +286,9 @@ func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponse, error) {
 		categoryMap[ca.ID] = *ca
 	}
 
-	var responseNews []*domain.NewsResponse
+	var responseNews []*domain.NewsResponseV2
 
-	for _, news := range news {
-		var images []domain.UploadFileResponseHomePage
-		for _, imgID := range news.Image {
-			if img, ok := uploadFileMap[imgID]; ok {
-				images = append(images, img)
-			}
-		}
+	for _, news := range lastedNews {
 
 		var categoryResponse domain.CategoryResponse
 		if news.CategoryID != "" {
@@ -269,40 +297,50 @@ func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponse, error) {
 			}
 		}
 
-		fmt.Printf("categoryResponse: %v\n", categoryResponse.CategoryType)
+		var thumnailResponse domain.UploadFileResponseHomePage
+		if news.ThumnailID != "" {
+			if thum, ok := thumnailMap[news.ThumnailID]; ok {
+				thumnailResponse = thum
+			}
+		}
 
-		resp := &domain.NewsResponse{
+		resp := &domain.NewsResponseV2{
 			ID:          news.ID,
+			ThumnailID:  thumnailResponse,
 			Title:       news.Title,
 			Description: news.Description,
 			Content:     news.Content,
-			Image:       images,
 			CategoryID:  categoryResponse,
-			Tag:         news.Tag,
+			Tags:        news.Tags,
 			Status:      news.Status,
 			ContentType: news.ContentType,
+			View:        news.View,
 			CreatedAt:   news.CreatedAt,
-			UpdatedAt:   news.UpdatedAt,
 		}
 		responseNews = append(responseNews, resp)
-	}
-
-	for _, item := range responseNews {
-		for j, img := range item.Image {
-			item.Image[j].Path = utils.AttachBaseURLToImage(img.Filetype, img.Path)
-		}
 	}
 
 	return responseNews, nil
 }
 
-func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page string) ([]*d.NewsResponse, error) {
+// เอาไว้ query หน้า
+func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page, status, view string) ([]*d.NewsResponseV2, error) {
 
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
 	Sort = strings.ToLower(Sort)
-	if Sort != "asc" && Sort != "desc" {
+	view = strings.ToLower(view)
+
+	if Sort == "" {
+
+	} else if Sort != "asc" && Sort != "desc" {
+		return nil, fmt.Errorf("sort must be 'asc' or 'desc'")
+	}
+
+	if view == "" {
+
+	} else if view != "asc" && view != "desc" {
 		return nil, fmt.Errorf("sort must be 'asc' or 'desc'")
 	}
 
@@ -318,13 +356,14 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page string) ([]*d.N
 		return nil, err
 	}
 
-	CacheKey := "news_cache:" + catID + "_" + ConType + "_" + page + "_" + limit
+	CacheKey := "news_cache:" + catID + "_" + ConType + "_" + page + "_" + limit + "_" + status + "_" + view
 	if ConType == "" {
-		CacheKey = "news_cache:" + catID + "_" + "All" + "_" + page + "_" + limit
+		CacheKey = "news_cache:" + catID + "_" + "All" + "_" + page + "_" + limit + "_" + status
 	}
+
 	// cache area //
 	if page == "1" {
-		var cacheNewsCategory []*d.NewsResponse
+		var cacheNewsCategory []*d.NewsResponseV2
 		err = n.cache.Get(ctx, CacheKey, &cacheNewsCategory)
 		if err == nil && len(cacheNewsCategory) > 0 {
 			fmt.Printf("cacheKey: %v\n", CacheKey)
@@ -334,97 +373,94 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page string) ([]*d.N
 		log.Println("Cache Miss:", CacheKey)
 	}
 
-	findingNemo, err := n.newRepo.Find(catID, ConType, Sort, parseLimit, parsePage)
+	findingNemo, err := n.newRepo.Find(catID, ConType, Sort, status, view, parseLimit, parsePage)
 	if err != nil {
 		return nil, err
 	}
 
-	imageIDMap := make(map[string]struct{})
-	categoryIDMap := make(map[string]struct{})
-
-	for _, news := range findingNemo {
-		for _, imgID := range news.Image {
-			imageIDMap[imgID] = struct{}{}
+	thumbIDs := make([]string, 0)
+	catIDs := make([]string, 0)
+	for _, n := range findingNemo {
+		if n.ThumnailID != "" {
+			thumbIDs = append(thumbIDs, n.ThumnailID)
 		}
-		if news.CategoryID != "" {
-			categoryIDMap[news.CategoryID] = struct{}{}
-		}
-	}
-
-	imageIDs := keysFromMap(imageIDMap)
-	categoryIDs := keysFromMap(categoryIDMap)
-
-	uploadFiles, err := n.fileRepo.GetFilesByIDs(imageIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	categories, err := n.categoryService.GetByIDs(categoryIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	uploadFileMap := make(map[string]domain.UploadFileResponseHomePage)
-	for _, f := range uploadFiles {
-		uploadFileMap[f.ID] = domain.UploadFileResponseHomePage{
-			ID:       f.ID,
-			Path:     f.Path,
-			Filetype: f.FileType,
+		if n.CategoryID != "" {
+			catIDs = append(catIDs, n.CategoryID)
 		}
 	}
 
-	categoryMap := make(map[string]domain.CategoryResponse)
-	for _, ca := range categories {
-		categoryMap[ca.ID] = *ca
+	thumbnails, _ := n.fileService.GetFilesByIDsVTest(thumbIDs)
+	categories, _ := n.categoryService.GetByIDs(catIDs)
+
+	thumbMap := make(map[string]domain.UploadFileResponseHomePage)
+	for _, t := range thumbnails {
+		thumbMap[t.ID] = domain.UploadFileResponseHomePage{
+			ID:       t.ID,
+			Path:     t.Path,
+			FileType: t.FileType,
+		}
 	}
 
-	var responseNews []*domain.NewsResponse
-
-	for _, news := range findingNemo {
-		var images []domain.UploadFileResponseHomePage
-		for _, imgID := range news.Image {
-			if img, ok := uploadFileMap[imgID]; ok {
-				images = append(images, img)
-			}
-		}
-
-		var categoryResponse domain.CategoryResponse
-		if news.CategoryID != "" {
-			if cat, ok := categoryMap[news.CategoryID]; ok {
-				categoryResponse = cat
-			}
-		}
-
-		resp := &domain.NewsResponse{
-			ID:          news.ID,
-			Title:       news.Title,
-			Description: news.Description,
-			Content:     news.Content,
-			Image:       images,
-			CategoryID:  categoryResponse,
-			Tag:         news.Tag,
-			Status:      news.Status,
-			ContentType: news.ContentType,
-			CreatedAt:   news.CreatedAt,
-			UpdatedAt:   news.UpdatedAt,
-		}
-		responseNews = append(responseNews, resp)
+	catMap := make(map[string]domain.CategoryResponse)
+	for _, c := range categories {
+		catMap[c.ID] = *c
 	}
 
-	for _, item := range responseNews {
-		for j, img := range item.Image {
-			item.Image[j].Path = utils.AttachBaseURLToImage(img.Filetype, img.Path)
+	var result []*domain.NewsResponseV2
+	for _, nemo := range findingNemo {
+		resp := &domain.NewsResponseV2{
+			ID:          nemo.ID,
+			Title:       nemo.Title,
+			Description: nemo.Description,
+			Content:     nemo.Content,
+			Status:      nemo.Status,
+			ContentType: nemo.ContentType,
+			CreatedAt:   nemo.CreatedAt,
+			Tags:        nemo.Tags,
+			View:        nemo.View,
 		}
+
+		if thumb, ok := thumbMap[nemo.ThumnailID]; ok {
+			resp.ThumnailID = thumb
+		}
+		if cat, ok := catMap[nemo.CategoryID]; ok {
+			resp.CategoryID = cat
+		}
+		result = append(result, resp)
 	}
 
 	if page == "1" {
-		err = n.cache.Set(ctx, CacheKey, responseNews, 5*time.Minute)
+		err = n.cache.Set(ctx, CacheKey, result, 5*time.Minute)
 		if err != nil {
 			return nil, fmt.Errorf("error setting cache for category %s: %v", CacheKey, err)
 		}
 	}
 
-	return responseNews, nil
+	return result, nil
+}
+
+func (n *NewsServiceImpl) Count(catID, ConType, Status, limit, page string) (*d.PaginationResp, error) {
+
+	total, err := n.newRepo.Count(catID, ConType, Status)
+	if err != nil {
+		return nil, fmt.Errorf("cannot fetch count data:%s", err)
+	}
+
+	parseLimit, err := strconv.ParseInt(limit, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	totalPageSum := int64(math.Ceil(float64(total) / float64(parseLimit)))
+
+	paginate := &domain.PaginationResp{
+		TotalItems:  strconv.FormatInt(total, 10),
+		TotalPages:  strconv.FormatInt(totalPageSum, 10),
+		CurrentPage: page,
+		PageSize:    limit,
+	}
+
+	return paginate, err
 }
 
 // func (n *NewsServiceImpl) GetNewsByCategoryHomePage(categoryID string) ([]d.News, error) {
@@ -503,18 +539,18 @@ func (n *NewsServiceImpl) UpdateNews(id string, req *d.News) error {
 		req.CategoryID = existingNews.CategoryID
 	}
 
-	if len(req.Image) > 0 {
-		img, err := n.fileRepo.ValidateImageIDs(req.Image)
+	if len(req.ImageIDs) > 0 {
+		img, err := n.fileRepo.ValidateImageIDs(req.ImageIDs)
 		if err != nil {
 			return fmt.Errorf("failed to get image files: %w", err)
 		}
-		existingNews.Image = img
+		existingNews.ImageIDs = img
 	} else {
-		req.Image = existingNews.Image
+		req.ImageIDs = existingNews.ImageIDs
 	}
 
 	// debug ต้องนานดันไป get id cache มาหมดเวลาไป 5 ชม. บ่ได้หยัง //
-	fmt.Println("existing", existingNews.Image)
+	fmt.Println("existing", existingNews.ImageIDs)
 
 	if req.Title == "" {
 		req.Title = existingNews.Title
@@ -534,13 +570,13 @@ func (n *NewsServiceImpl) UpdateNews(id string, req *d.News) error {
 		existingNews.Content = req.Content
 	}
 
-	if len(req.Tag) == 0 {
-		req.Tag = existingNews.Tag
+	if len(req.Tags) == 0 {
+		req.Tags = existingNews.Tags
 	} else {
-		existingNews.Tag = req.Tag
+		existingNews.Tags = req.Tags
 	}
 
-	if !req.Status {
+	if req.Status == "" {
 		req.Status = existingNews.Status
 	} else {
 		existingNews.Status = req.Status

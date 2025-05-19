@@ -25,5 +25,5 @@ type UploadFileResponse struct {
 type UploadFileResponseHomePage struct {
 	ID       string `json:"id"`
 	Path     string `json:"path"`
-	Filetype string `json:"file_type"`
+	FileType string `json:"file_type"`
 }

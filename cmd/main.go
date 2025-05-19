@@ -79,7 +79,7 @@ func Init(config *config.Container) {
 		slog.Error("Error ensuring news indexes", "error", err)
 		os.Exit(1)
 	}
-	newService := service.NewsService(newsRepo, categoryRepo, cacheClient, uploadRepo, categoryService)
+	newService := service.NewsService(newsRepo, categoryRepo, cacheClient, uploadRepo, categoryService, uploadServiec)
 	newHandler := handler.NewNewsHandler(mediaService, newService, categoryService, cacheClient, infographicService)
 
 	// run server from server.go //

@@ -21,3 +21,20 @@ func ConvertStringToObjectID(id string) (primitive.ObjectID, error) {
 	}
 	return objectID, nil
 }
+
+func ConvertStringToObjectIDArray(ids []string) ([]primitive.ObjectID, error) {
+	if len(ids) == 0 {
+		return []primitive.ObjectID{}, nil
+	}
+
+	objIDs := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ObjectID format (%s): %w", id, err)
+		}
+		objIDs = append(objIDs, objID)
+	}
+
+	return objIDs, nil
+}
