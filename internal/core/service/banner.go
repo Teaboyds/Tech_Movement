@@ -24,210 +24,101 @@ func (ban *BannerService) CreateBanner( /*parameter*/ banner *domain.Banner) err
 
 	fmt.Printf("banner: %v\n", banner)
 
-	if strings.TrimSpace(banner.Title) == "" || strings.TrimSpace(banner.ContentType) == "" {
-		return fmt.Errorf("please input error")
+	if !banner.Status.Home && !banner.Status.Media && !banner.Status.News && !banner.Status.Infographic {
+		banner.Status.Home = true
+		banner.Status.Media = true
+		banner.Status.News = true
+		banner.Status.Infographic = true
 	}
 
-	_, err := ban.cateRepo.GetByID(banner.Category)
+	normalizeImage(&banner.DesktopImage)
+	normalizeImage(&banner.MobileImage)
+
+	if banner.Action == "" {
+		banner.Action = "On"
+	} else {
+		actionCheck := utils.IsValidAction(banner.Action)
+		if !actionCheck {
+			return fmt.Errorf("action must be 'on' or 'off'")
+		}
+	}
+
+	err := ban.bannerRepo.SaveBanner(banner)
 	if err != nil {
 		return err
 	}
-
-	_, err = ban.uploadSer.ValidateImageIDs(banner.Img)
-	if err != nil {
-		return err
-	}
-
-	err = ban.bannerRepo.SaveBanner(banner)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("banner.Status: %T\n banner.ContentTyep: %v\n", banner.Status, banner.ContentType)
 
 	return nil
 }
 
-func (ban *BannerService) GetBanner(id string) (*domain.BannerClient, error) {
+func (ban *BannerService) GetBanner(id string) (*domain.Banner, error) {
 
-	banner, err := ban.bannerRepo.Retrive(id)
+	bannerResp, err := ban.bannerRepo.Retrive(id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot retrive banner in service : %v", err)
 	}
 
-	fmt.Printf("id: %v\n", id)
+	bannerResp.DesktopImage.Path = utils.AttachBaseURLToImageFolder("banner", bannerResp.DesktopImage.FileType, bannerResp.DesktopImage.Path)
+	bannerResp.MobileImage.Path = utils.AttachBaseURLToImageFolder("banner", bannerResp.MobileImage.FileType, bannerResp.MobileImage.Path)
 
-	cate, err := ban.cateRepo.GetByID(banner.Category)
-	if err != nil {
-		return nil, err
-	}
-
-	uploadFiles, err := ban.uploadRepo.GetFilesByIDs(banner.Img)
-	if err != nil {
-		return nil, err
-	}
-
-	var images []domain.UploadFileResponse
-	for _, file := range uploadFiles {
-		images = append(images, domain.UploadFileResponse{
-			ID:       file.ID,
-			Path:     file.Path,
-			Name:     file.Name,
-			FileType: file.FileType,
-			Type:     file.Type,
-		})
-	}
-
-	blueJeans := &domain.CategoryResponse{
-		ID:   cate.ID,
-		Name: cate.Name,
-	}
-
-	resp := &domain.BannerClient{
-		Title:       banner.Title,
-		ContentType: banner.ContentType,
-		Status:      banner.Status,
-		Category:    *blueJeans,
-		Images:      images,
-	}
-
-	fmt.Printf("resp: %v\n", resp)
-
-	return resp, nil
+	return bannerResp, err
 }
 
-func (ban *BannerService) GetBanners() ([]*domain.BannerClient, error) {
-	banners, err := ban.bannerRepo.Retrives()
+func (ban *BannerService) GetBanners(page_type string) ([]*domain.Banner, error) {
+
+	bannerResp, err := ban.bannerRepo.Retrives(page_type)
 	if err != nil {
-		return nil, err
-	}
-	imageIDBan := make(map[string]struct{})
-	categoryIDBan := make(map[string]struct{})
-
-	for _, banner := range banners {
-		for _, imgID := range banner.Img {
-			imageIDBan[imgID] = struct{}{}
-		}
-		if banner.Category != "" {
-			categoryIDBan[banner.Category] = struct{}{}
-		}
-	}
-	imageIDs := keysFromMap(imageIDBan)
-	categories, err := ban.CategoryService.GetByIDs(keysFromMap(categoryIDBan))
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot fetch banners in service layer : %v", err)
 	}
 
-	uploadFildes, err := ban.uploadRepo.GetFilesByIDs(imageIDs)
-	if err != nil {
-		return nil, err
+	for _, banners := range bannerResp {
+		banners.DesktopImage.Path = utils.AttachBaseURLToImageFolder("banner", banners.DesktopImage.FileType, banners.DesktopImage.Path)
+		banners.MobileImage.Path = utils.AttachBaseURLToImageFolder("banner", banners.MobileImage.FileType, banners.MobileImage.Path)
 	}
 
-	uploadFileMap := make(map[string]domain.UploadFileResponse)
-	for _, f := range uploadFildes {
-		uploadFileMap[f.ID] = domain.UploadFileResponse{
-			ID:       f.ID,
-			Path:     f.Path,
-			Name:     f.Name,
-			FileType: f.FileType,
-			Type:     f.Type,
-		}
-	}
-
-	categoryMap := make(map[string]domain.CategoryResponse)
-	for _, ca := range categories {
-		categoryMap[ca.ID] = *ca
-	}
-	var responseBanners []*domain.BannerClient
-	for _, result := range banners {
-		var categoryResponse domain.CategoryResponse
-		if result.Category != "" {
-			if cat, ok := categoryMap[result.Category]; ok {
-				categoryResponse = cat
-			}
-		}
-
-		var images []domain.UploadFileResponse
-		for _, imgID := range result.Img {
-			if img, ok := uploadFileMap[imgID]; ok {
-				images = append(images, img)
-			}
-		}
-
-		resp := &domain.BannerClient{
-			Title:       result.Title,
-			ContentType: result.ContentType,
-			Status:      result.Status,
-			Category:    categoryResponse,
-			Images:      images,
-		}
-
-		responseBanners = append(responseBanners, resp)
-	}
-	for _, item := range responseBanners {
-		for j, img := range item.Images {
-			item.Images[j].Path = utils.AttachBaseURLToImage(img.FileType, img.Path)
-		}
-	}
-
-	return responseBanners, nil
+	return bannerResp, err
 }
 
-func (ban *BannerService) Updated(id string, banner *domain.Banner) error {
+func (ban *BannerService) CreateBannerV2(banner *domain.BannerV2) error {
 
-	existingBanner, err := ban.bannerRepo.Retrive(id)
+	fmt.Printf("banner: %v\n", banner)
+
+	if !banner.Status.Home && !banner.Status.Media && !banner.Status.News && !banner.Status.Infographic {
+		banner.Status.Home = true
+		banner.Status.Media = true
+		banner.Status.News = true
+		banner.Status.Infographic = true
+	}
+
+	if banner.Action == "" {
+		banner.Action = "On"
+	} else {
+		actionCheck := utils.IsValidAction(banner.Action)
+		if !actionCheck {
+			return fmt.Errorf("action must be 'on' or 'off'")
+		}
+	}
+
+	err := ban.bannerRepo.SaveBannerV2(banner)
 	if err != nil {
 		return err
 	}
-	if banner.Category != "" {
-		_, err := ban.cateRepo.GetByID(banner.Category)
-		if err != nil {
-			return err
-		}
-		existingBanner.Category = banner.Category
-	} else {
-		banner.Category = existingBanner.Category
-	}
-	if len(banner.Img) > 0 {
-		_, err := ban.uploadSer.ValidateImageIDs(banner.Img)
-		if err != nil {
-			return err
-		}
-		existingBanner.Img = banner.Img
-	} else {
-		banner.Img = existingBanner.Img
-	}
 
-	fmt.Println("existingBanner.Img: ", existingBanner.Img)
-
-	if banner.Title == "" {
-		banner.Title = existingBanner.Title
-	} else {
-		existingBanner.Title = banner.Title
-	}
-
-	if banner.ContentType == "" {
-		banner.ContentType = existingBanner.ContentType
-	} else {
-		existingBanner.ContentType = banner.ContentType
-	}
-
-	if !banner.Status {
-		banner.Status = existingBanner.Status
-	} else {
-		existingBanner.Status = banner.Status
-	}
-	err = ban.bannerRepo.Updated(id, banner)
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func (ban *BannerService) Delete(id string) error {
-
-	if err := ban.bannerRepo.Delete(id); err != nil {
-		return err
-	}
 	return nil
+}
+
+func (ban *BannerService) GetBannerV2(id string) (*domain.BannerV2, error) {
+	bannerResp, err := ban.bannerRepo.RetriveV2(id)
+	if err != nil {
+		return nil, fmt.Errorf("cannot retrive banner in service : %v", err)
+	}
+
+	return bannerResp, err
+}
+
+// helper //
+func normalizeImage(img *domain.ImageInfo) {
+	img.Type = strings.TrimPrefix(img.Type, ".")
+	img.Name = strings.ReplaceAll(img.Name, " ", "_")
+	img.FileType = strings.TrimPrefix(img.FileType, "banner/")
 }

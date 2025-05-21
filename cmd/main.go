@@ -20,9 +20,6 @@ func Init(config *config.Container) {
 
 	ctx := context.Background()
 
-	fmt.Println("MongoDB URI:", config.DB.URL)
-	fmt.Println("MongoDB Name:", config.DB.DB_NAME)
-
 	// connect mongodb //
 	db, err := mongodb.ConnectDB(ctx, config.DB)
 	if err != nil {
@@ -61,17 +58,17 @@ func Init(config *config.Container) {
 	// Media //
 	mediaRepo := repository.NewMediaRepositoryMongo(db)
 	mediaService := service.NewMediaService(mediaRepo, categoryRepo, categoryService, uploadServiec)
-	mediaHandler := handler.NewMediaHandler(mediaService)
+	mediaHandler := handler.NewMediaHandler(mediaService, categoryService)
 
 	// InfoGraphic //
 	infographicRepo := repository.NewInfographicRepositoryMongo(db)
 	infographicService := service.NewInfographicService(infographicRepo, uploadServiec, categoryService)
-	infographicHandler := handler.NewInfographicHandler(infographicService)
+	infographicHandler := handler.NewInfographicHandler(infographicService, categoryService, uploadServiec)
 
 	// Banner //
 	bannerRepo := repository.NewBannersRepoMongo(db)
 	bannerService := service.NewBannerService(bannerRepo, categoryRepo, uploadServiec, uploadRepo, categoryService)
-	bannerHandler := handler.NewBannerHandler(bannerService, categoryService)
+	bannerHandler := handler.NewBannerHandler(bannerService, categoryService, *config)
 
 	// News //
 	newsRepo := repository.NewNewsRepo(db)

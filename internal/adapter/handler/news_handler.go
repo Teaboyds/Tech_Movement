@@ -171,63 +171,63 @@ func (h *NewsHandler) GetTechNews(c *fiber.Ctx) error {
 	})
 }
 
-func (h *NewsHandler) GetVideoHome(c *fiber.Ctx) error {
+// func (h *NewsHandler) GetVideoHome(c *fiber.Ctx) error {
 
-	VDO, err := h.mediaService.GetVideoHome()
-	if err != nil {
-		log.Println(err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "cannot fecth Video data",
-		})
-	}
+// 	VDO, err := h.mediaService.GetVideoHome()
+// 	if err != nil {
+// 		log.Println(err)
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "cannot fecth Video data",
+// 		})
+// 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "ข่าว Technology",
-		"data":    VDO,
-	})
-}
+// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+// 		"message": "ข่าว Technology",
+// 		"data":    VDO,
+// 	})
+// }
 
-func (h *NewsHandler) GetShortVideoHome(c *fiber.Ctx) error {
+// func (h *NewsHandler) GetShortVideoHome(c *fiber.Ctx) error {
 
-	ShortVDO, err := h.mediaService.GetShortVideoHome()
-	if err != nil {
-		log.Println(err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "cannot fecth ShortVideo data",
-		})
-	}
+// 	ShortVDO, err := h.mediaService.GetShortVideoHome()
+// 	if err != nil {
+// 		log.Println(err)
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "cannot fecth ShortVideo data",
+// 		})
+// 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "ข่าว Technology",
-		"data":    ShortVDO,
-	})
-}
+// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+// 		"message": "ข่าว Technology",
+// 		"data":    ShortVDO,
+// 	})
+// }
 
-func (h *NewsHandler) GetInfoHome(c *fiber.Ctx) error {
+// func (h *NewsHandler) GetInfoHome(c *fiber.Ctx) error {
 
-	Info, err := h.infoGraphic.GetInfoHome()
-	if err != nil {
-		log.Println(err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "cannot fecth Info data",
-		})
-	}
+// 	Info, err := h.infoGraphic.GetInfoHome()
+// 	if err != nil {
+// 		log.Println(err)
+// 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+// 			"message": "cannot fecth Info data",
+// 		})
+// 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Infographic",
-		"data":    Info,
-	})
-}
+// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+// 		"message": "Infographic",
+// 		"data":    Info,
+// 	})
+// }
 
 func (h *NewsHandler) GetHomePage(c *fiber.Ctx) error {
 
-	Video, err := h.mediaService.GetVideoHome()
-	if err != nil {
-		log.Println(err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "cannot fecth Video data",
-		})
-	}
+	// Video, err := h.mediaService.GetVideoHome()
+	// if err != nil {
+	// 	log.Println(err)
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"message": "cannot fecth Video data",
+	// 	})
+	// }
 
 	TechNews, err := h.service.GetTechnologyNews()
 	if err != nil {
@@ -245,29 +245,27 @@ func (h *NewsHandler) GetHomePage(c *fiber.Ctx) error {
 		})
 	}
 
-	shortVDO, err := h.mediaService.GetShortVideoHome()
-	if err != nil {
-		log.Println(err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "cannot fecth shortVdo data",
-		})
-	}
+	// shortVDO, err := h.mediaService.GetShortVideoHome()
+	// if err != nil {
+	// 	log.Println(err)
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"message": "cannot fecth shortVdo data",
+	// 	})
+	// }
 
-	Infographic, err := h.infoGraphic.GetInfoHome()
-	if err != nil {
-		log.Println(err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "cannot fecth infographic data",
-		})
-	}
+	// Infographic, err := h.infoGraphic.GetInfoHome()
+	// if err != nil {
+	// 	log.Println(err)
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"message": "cannot fecth infographic data",
+	// 	})
+	// }
 
 	resp := domain.Home{
 		Message:        "Home Landing Page",
-		Video:          Video,
 		TechnologyNews: TechNews,
 		LastedNews:     lastNews,
-		Short:          shortVDO,
-		Infographic:    Infographic,
+		// Infographic:    Infographic,
 	}
 
 	return c.Status(fiber.StatusOK).JSON(resp)

@@ -281,7 +281,7 @@ func (n *MongoNewsRepository) Find(catID, ConType, Sort, status, view, search st
 
 	if Sort == "newest" {
 		opts.SetSort(bson.D{{Key: "created_at", Value: 1}})
-	} else if Sort == "lowest" {
+	} else if Sort == "oldest" {
 		opts.SetSort(bson.D{{Key: "created_at", Value: -1}})
 	}
 

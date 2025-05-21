@@ -2,6 +2,7 @@ package repository
 
 import (
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb"
+	mongoMapper "backend_tech_movement_hex/internal/adapter/storage/mongodb/mapper"
 	"backend_tech_movement_hex/internal/adapter/storage/mongodb/models"
 	mongoUtils "backend_tech_movement_hex/internal/adapter/storage/mongodb/utils"
 	"backend_tech_movement_hex/internal/core/domain"
@@ -11,9 +12,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MongoBannerRepository struct {
@@ -26,180 +25,122 @@ func NewBannersRepoMongo(db *mongodb.Database) port.BannerRepository {
 	}
 }
 
-func (n *MongoBannerRepository) SaveBanner( /*parameter*/ banner *domain.Banner) error {
+func (n *MongoBannerRepository) SaveBanner(banner *domain.Banner) error {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	CateOBJ, err := mongoUtils.ConvertStringToObjectID(banner.Category)
-	if err != nil {
-		return err
-	}
-
-	var objIDs []primitive.ObjectID
-	for _, id := range banner.Img {
-		objID, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			return err
-		}
-		objIDs = append(objIDs, objID)
-	}
-
 	bannerDoc := &models.MongoBanner{
-		Title:       banner.Title,
-		ContentType: banner.ContentType,
-		Status:      banner.Status,
-		CategoryID:  CateOBJ,
-		ImageID:     objIDs,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		DesktopImage: models.ImageInfo(banner.DesktopImage),
+		MobileImage:  models.ImageInfo(banner.MobileImage),
+		Status:       models.StatusType(banner.Status),
+		LinkUrl:      banner.LinkUrl,
+		Action:       banner.Action,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
-	_, err = n.collection.InsertOne(ctx, bannerDoc)
+	_, err := n.collection.InsertOne(ctx, bannerDoc)
 	return err
 }
 
 func (n *MongoBannerRepository) Retrive(id string) (*domain.Banner, error) {
 
-	ObjID, err := mongoUtils.ConvertStringToObjectID(id)
+	ctx, cancel := utils.NewTimeoutContext()
+	defer cancel()
+
+	objID, err := mongoUtils.ConvertStringToObjectID(id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot convert string to objected id : %v", err)
 	}
 
 	var banner models.MongoBanner
 
-	ctx, cancel := utils.NewTimeoutContext()
-	defer cancel()
-
-	filter := bson.M{"_id": ObjID}
+	filter := bson.M{"_id": objID}
 
 	err = n.collection.FindOne(ctx, filter).Decode(&banner)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot fetch banner info : %v", err)
 	}
 
-	var imgOBJ []string
-	for _, ids := range banner.ImageID {
-		imgOBJ = append(imgOBJ, ids.Hex())
-	}
+	bannerResponse := mongoMapper.BannerToDomain(banner)
 
-	response := &domain.Banner{
-		ID:          banner.ID.Hex(),
-		Title:       banner.Title,
-		ContentType: banner.ContentType,
-		Status:      banner.Status,
-		Category:    banner.CategoryID.Hex(),
-		Img:         imgOBJ,
-	}
-
-	fmt.Printf("response: %v\n", response)
-
-	return response, nil
+	return bannerResponse, err
 }
-func (n *MongoBannerRepository) Retrives() ([]*domain.Banner, error) {
+
+func (n *MongoBannerRepository) Retrives(page_type string) ([]*domain.Banner, error) {
+
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	var banners []*models.MongoBanner
+	finder := bson.M{}
 
-	findBanner := options.Find().
-		SetLimit(5).
-		SetSort(bson.D{{Key: "created_at", Value: -1}})
+	if page_type != "" {
+		finder["status."+page_type] = true
 
-	filter := bson.M{
-		"status": true,
 	}
-	cursor, err := n.collection.Find(ctx, filter, findBanner)
+
+	cursor, err := n.collection.Find(ctx, finder)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	if err := cursor.All(ctx, &banners); err != nil {
+	var bannersResp []*domain.Banner
+	for cursor.Next(ctx) {
+		var banners models.MongoBanner
+		if err := cursor.Decode(&banners); err != nil {
+			return nil, err
+		}
+
+		bannersDTO := mongoMapper.BannerToDomain(banners)
+
+		bannersResp = append(bannersResp, bannersDTO)
+	}
+
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 
-	var responses []*domain.Banner
-	for _, banner := range banners {
-		var imageIDs []string
-		for _, oid := range banner.ImageID {
-			imageIDs = append(imageIDs, oid.Hex())
-		}
-
-		responseBanner := &domain.Banner{
-			ID:          banner.ID.Hex(),
-			Title:       banner.Title,
-			ContentType: banner.ContentType,
-			Status:      banner.Status,
-			Category:    banner.CategoryID.Hex(),
-			Img:         imageIDs,
-		}
-		responses = append(responses, responseBanner)
-	}
-	return responses, nil
+	return bannersResp, err
 }
 
-func (n *MongoBannerRepository) Updated(id string, banner *domain.Banner) error {
+func (n *MongoBannerRepository) SaveBannerV2(banner *domain.BannerV2) error {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	ObjID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return err
-	}
-	CateObj, err := primitive.ObjectIDFromHex(banner.Category)
-	if err != nil {
-		return err
-	}
-
-	var objIDs []primitive.ObjectID
-	for _, id := range banner.Img {
-		objID, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			return err
-		}
-		objIDs = append(objIDs, objID)
-
-	}
-	fmt.Printf("objIDs: %v\n", objIDs)
-
-	update := bson.M{
-		"$set": bson.M{
-			"title":        banner.Title,
-			"content_type": banner.ContentType,
-			"status":       banner.Status,
-			"category_id":  CateObj,
-			"image_id":     objIDs,
-			"updated_at":   time.Now(),
-		},
+	bannerDoc := &models.MongoBannerV2{
+		DesktopImage: banner.DesktopImage,
+		MobileImage:  banner.MobileImage,
+		Status:       models.StatusType(banner.Status),
+		LinkUrl:      banner.LinkUrl,
+		Action:       banner.Action,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
-	filter := bson.M{"_id": ObjID}
-	result, err := n.collection.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-	if result.ModifiedCount == 0 {
-		return mongo.ErrNoDocuments
-	}
-
-	return nil
+	_, err := n.collection.InsertOne(ctx, bannerDoc)
+	return err
 }
 
-func (banner *MongoBannerRepository) Delete(id string) error {
+func (n *MongoBannerRepository) RetriveV2(id string) (*domain.BannerV2, error) {
 	ctx, cancel := utils.NewTimeoutContext()
 	defer cancel()
 
-	ObjID, err := primitive.ObjectIDFromHex(id)
+	objID, err := mongoUtils.ConvertStringToObjectID(id)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("cannot convert string to objected id : %v", err)
 	}
 
-	result, err := banner.collection.DeleteOne(ctx, bson.M{"_id": ObjID})
+	var banner models.MongoBannerV2
+
+	filter := bson.M{"_id": objID}
+
+	err = n.collection.FindOne(ctx, filter).Decode(&banner)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("cannot fetch banner info : %v", err)
 	}
-	if result.DeletedCount == 0 {
-		return mongo.ErrNoDocuments
-	}
-	return nil
+
+	bannerResponse := mongoMapper.MongoBannerToDomain(banner)
+
+	return bannerResponse, err
 }

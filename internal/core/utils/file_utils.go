@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"backend_tech_movement_hex/internal/core/domain"
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +31,7 @@ func UploadFile(c *fiber.Ctx, fieldName string, maxSize int64, uploadDir string)
 	}
 
 	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
-	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
+	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".webp" {
 		return nil, fmt.Errorf("invalid file type")
 	}
 
@@ -73,6 +75,18 @@ func AttachBaseURLToImage(filetype string, path string) string {
 	return RealURL
 }
 
+func AttachBaseURLToImageFolder(folder string, filetype string, path string) string {
+	baseURL := os.Getenv("BASE_URL")
+	RealURL := baseURL + folder + "/" + filetype + "/" + path
+	return RealURL
+}
+
+func AttachBaseURLToImageFolderV2(path string) string {
+	baseURL := os.Getenv("BASE_URL")
+	RealURL := baseURL + path
+	return RealURL
+}
+
 func DeleteFileInLocalStorage(fileType string, name string) error {
 	fullPath := "../upload/" + fileType + "/" + name
 	fmt.Printf("fullPath: %q\n", fullPath)
@@ -95,4 +109,34 @@ func DeleteFileInLocalStorage(fileType string, name string) error {
 
 	log.Printf("Image deleted: %s", fullPath)
 	return nil
+}
+
+func GetImageMetadata(folder string, fileName string, t string) (*domain.MetaData, error) {
+	path := folder + "/" + fileName
+	fmt.Printf("path: %v\n", path)
+	f, err := os.Open(path)
+	if err != nil {
+		return &domain.MetaData{}, err
+	}
+	defer f.Close()
+
+	fi, _ := f.Stat()
+	mimeType := mime.TypeByExtension(filepath.Ext(fileName))
+
+	url := t + fileName
+
+	return &domain.MetaData{
+		Alt:      fileName,
+		Size:     fi.Size(),
+		MimeType: mimeType,
+		Url:      AttachBaseURLToImageFolderV2(url),
+	}, nil
+}
+
+type MetaData struct {
+	Alt      string `json:"alt"`
+	Url      string `json:"url"`
+	Size     int64  `json:"size"`
+	MimeType string `json:"mime_type"`
+	Type     string `json:"type"`
 }

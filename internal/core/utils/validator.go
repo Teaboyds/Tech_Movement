@@ -39,7 +39,7 @@ func ValidateCategoryInput(file *domain.CategoryRequest) error {
 	return nil
 }
 
-func FixInfoMultipart(c *fiber.Ctx, input *domain.InfographicRequest) error {
+func FixInfoMultipart(c *fiber.Ctx, input *domain.InfographicRequestDTO) error {
 	form, err := c.MultipartForm()
 	if err != nil {
 		return err
@@ -47,19 +47,6 @@ func FixInfoMultipart(c *fiber.Ctx, input *domain.InfographicRequest) error {
 
 	if catID, ok := form.Value["category_id"]; ok && len(catID) > 0 {
 		input.Category = catID[0]
-	}
-
-	return nil
-}
-
-func FixMediaMultipart(c *fiber.Ctx, input *domain.MediaRequest) error {
-	form, err := c.MultipartForm()
-	if err != nil {
-		return err
-	}
-
-	if catID, ok := form.Value["category_id"]; ok && len(catID) > 0 {
-		input.CategoryID = catID[0]
 	}
 
 	return nil

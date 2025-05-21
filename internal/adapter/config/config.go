@@ -9,12 +9,14 @@ import (
 
 type (
 	Container struct {
-		App   *App
-		DB    *DB
-		HTTP  *HTTP
-		Redis *Redis
-		OneID *OneID
-		JWT   *JWT
+		App     *App
+		DB      *DB
+		HTTP    *HTTP
+		Redis   *Redis
+		OneID   *OneID
+		JWT     *JWT
+		IMG     *IMG
+		ImgPath *ImgPath
 	}
 
 	App struct {
@@ -53,6 +55,16 @@ type (
 
 	JWT struct {
 		SecretKey string
+	}
+
+	IMG struct {
+		BannerDesktop string
+		BannerMobile  string
+	}
+
+	ImgPath struct {
+		BannerDesktop string
+		BannerMobile  string
 	}
 )
 
@@ -103,13 +115,25 @@ func New() (*Container, error) {
 		SecretKey: utils.GetEnv("JWT_SECRET_KEY", ""),
 	}
 
+	image := &IMG{
+		BannerDesktop: utils.GetEnv("Directory_Desktop", ""),
+		BannerMobile:  utils.GetEnv("Directory_Mobile", ""),
+	}
+
+	imgPath := &ImgPath{
+		BannerDesktop: utils.GetEnv("Path_Desktop", ""),
+		BannerMobile:  utils.GetEnv("Path_Mobile", ""),
+	}
+
 	return &Container{
-		App:   app,
-		DB:    db,
-		HTTP:  http,
-		Redis: redis,
-		OneID: oneID,
-		JWT:   jwt,
+		App:     app,
+		DB:      db,
+		HTTP:    http,
+		Redis:   redis,
+		OneID:   oneID,
+		JWT:     jwt,
+		IMG:     image,
+		ImgPath: imgPath,
 	}, nil
 
 }

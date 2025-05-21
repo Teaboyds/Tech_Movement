@@ -13,6 +13,7 @@ type MongoInfographic struct {
 	Category  primitive.ObjectID `bson:"category"`
 	Tags      []string           `bson:"tags"`
 	Status    bool               `bson:"status"`
+	PageView  int                `json:"page_view"`
 	CreatedAt time.Time          `bson:"created_at"`
 	UpdatedAt time.Time          `bson:"updated_at"`
 }

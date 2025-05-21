@@ -32,6 +32,9 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 	app.Get("/swagger/*", swagger.HandlerDefault)
 	app.Static("/upload/news", "../upload/news")
 	app.Static("/upload/media", "./upload/media")
+	app.Static("/upload/infographic", "../upload/infographic")
+	app.Static("/upload/banner/desktop", "../upload/banner/desktop")
+	app.Static("/upload/banner/mobile", "../upload/banner/mobile")
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     p.Config.HttpOrigins,
 		AllowHeaders:     "Origin, Content-Type, Accept",
@@ -74,12 +77,15 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 		media := v1.Group("/media")
 		{
 			media.Post("/", p.MediaHandler.CreateMedia)
+			media.Get("/", p.MediaHandler.GetMedias)
+			media.Get("/:id", p.MediaHandler.GetMedia)
 		}
 
 		infographic := v1.Group("/infographic")
 		{
 			infographic.Post("/", p.InfographicHandler.CreateInfographic)
-			infographic.Get("/", p.InfographicHandler.GetInfoHome)
+			infographic.Get("/:id", p.InfographicHandler.GetInfographic)
+			infographic.Get("/", p.InfographicHandler.GetInfographics)
 		}
 
 		home := v1.Group("/home")
@@ -87,9 +93,9 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			home.Get("/lastedNews", p.NewsHandler.GetLastNews)
 			home.Get("/TechNews", p.NewsHandler.GetTechNews)
 			home.Get("/", p.NewsHandler.GetHomePage)
-			home.Get("/VDO", p.NewsHandler.GetVideoHome)
-			home.Get("/Short", p.NewsHandler.GetShortVideoHome)
-			home.Get("/Info", p.NewsHandler.GetInfoHome)
+			// home.Get("/VDO", p.NewsHandler.GetVideoHome)
+			// home.Get("/Short", p.NewsHandler.GetShortVideoHome)
+			// home.Get("/Info", p.NewsHandler.GetInfoHome)
 			// home.Get("/techNews", p.NewsHandler.GetNewsByCategory)
 		}
 
@@ -98,8 +104,8 @@ func SetUpRoutes(p RouterParams) (*Router, error) {
 			banner.Post("/", p.BannerHandler.CreateBanner)
 			banner.Get("/:id", p.BannerHandler.GetBanner)
 			banner.Get("/", p.BannerHandler.GetBanners)
-			banner.Put("/:id", p.BannerHandler.UpdateBanner)
-			banner.Delete("/:id", p.BannerHandler.DeleteBanner)
+			banner.Post("/V2", p.BannerHandler.CreateBannerV2)
+			banner.Get("/V2/:id", p.BannerHandler.GetBannerV2)
 		}
 
 	}

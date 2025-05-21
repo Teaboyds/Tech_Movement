@@ -35,6 +35,7 @@ type NewsResponse struct {
 	Tags        []string             `json:"tag"`
 	Status      string               `json:"status"`
 	ContentType string               `json:"content_type"`
+	PageView    string               `json:"page_view"`
 	CreatedAt   string               `json:"created_at"`
 	UpdatedAt   string               `json:"updated_at"`
 }
@@ -45,7 +46,7 @@ type NewsResponseV2 struct {
 	Title       string             `json:"title"`
 	Description string             `json:"description"`
 	Content     string             `json:"content"`
-	CategoryID  CategoryResponse   `json:"category_id"`
+	CategoryID  Category           `json:"category_id"`
 	Tags        []string           `json:"tag"`
 	Status      string             `json:"status"`
 	ContentType string             `json:"content_type"`
@@ -62,7 +63,7 @@ type NewsRequest struct {
 	CategoryID  string   `json:"category_id" form:"category_id"`
 	Tags        []string `json:"tags" validate:"required,min=1,required"`
 	Status      string   `json:"status" validate:"required"`
-	ContentType string   `form:"content_type" validate:"required,oneof=Global_Tech Local_Tech"`
+	ContentType string   `form:"content_type" validate:"required,oneof=ต่างประเทศ ไทย"`
 }
 
 type UpdateNewsRequest struct {

@@ -44,3 +44,30 @@
         "message": "ข่าวล่าสุด"
     }
 ]
+
+ {
+      "id": "demo66c29b01",
+      "title": "เปิดตัว AI จีน Zhipu อย่างเป็นทางการ",
+      "content": "\u003Cp\u003EZhipu AI ได้เปิดตัวโมเดลใหม่ที่พัฒนาขึ้นในประเทศจีน...\u003C/p\u003E",
+      "video_url": "https://example.com/video/zhipu.mp4",
+      "thumbnail": {
+        "type": "jpg",
+        "url": "https://example.com/thumb/zhipu.jpg",
+        "alt": "Zhipu AI"
+      },
+      "category": [
+        {
+          "id": "demo66c12m01",
+          "name": "Short VDO"
+        }
+      ],
+      "tag": [
+        "AI",
+        "จีน",
+        "เทคโนโลยี"
+      ],
+      "page_view": 1234,
+      "action": "on",
+      "created_at": "2024-05-01T10:00:00.000Z",
+      "updated_at": "2024-05-02T10:00:00.000Z"
+    },

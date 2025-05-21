@@ -259,6 +259,7 @@ func (ul *MongoUploadRepository) GetFilesByIDsVTest(ids []string) ([]*up.UploadF
 			Path:      file.Path,
 			Name:      file.Name,
 			FileType:  file.FileType,
+			Type:      file.Type,
 			CreatedAt: file.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: file.UpdatedAt.Format(time.RFC3339),
 		})

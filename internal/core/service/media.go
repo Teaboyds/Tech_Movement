@@ -4,9 +4,7 @@ import (
 	"backend_tech_movement_hex/internal/core/domain"
 	"backend_tech_movement_hex/internal/core/port"
 	"backend_tech_movement_hex/internal/core/utils"
-	"errors"
 	"fmt"
-	"log"
 	"strconv"
 )
 
@@ -23,8 +21,8 @@ func NewMediaService(MediaRepo port.MediaRepository, categoryRepo port.CategoryR
 
 func (med *MediaService) CreateMedia(media *domain.Media) error {
 
-	if media.CategoryID == "" {
-		return errors.New("missing id in request body")
+	if media.Category == "" {
+		return fmt.Errorf("please input your category id")
 	}
 
 	if media.View == "" {
@@ -35,12 +33,12 @@ func (med *MediaService) CreateMedia(media *domain.Media) error {
 		}
 	}
 
-	_, err := med.fileService.GetFileByID(media.ThumnailID)
+	_, err := med.fileService.GetFileByID(media.Thumnail)
 	if err != nil {
 		return fmt.Errorf("cannot fecth media thumnail : %v", err)
 	}
 
-	_, err = med.categoryRepo.GetByID(media.CategoryID)
+	_, err = med.categoryRepo.GetByID(media.Category)
 	if err != nil {
 		return fmt.Errorf("cannot fecth category thumnail :%v", err)
 	}
@@ -49,7 +47,7 @@ func (med *MediaService) CreateMedia(media *domain.Media) error {
 		media.Action = "On"
 	} else {
 		actionCheck := utils.IsValidAction(media.Action)
-		if actionCheck == false {
+		if !actionCheck {
 			return fmt.Errorf("action must be 'on' or 'off'")
 		}
 	}
@@ -62,92 +60,133 @@ func (med *MediaService) CreateMedia(media *domain.Media) error {
 	return nil
 }
 
-func (med *MediaService) GetVideoHome() ([]*domain.VideoResponse, error) {
+func (med *MediaService) GetMedias(cateId, sort, view, limit, page string) ([]*domain.Media, error) {
 
-	category, err := med.categoryRepo.GetByName("Short Video")
+	if cateId == "" {
+		return nil, fmt.Errorf("please input category id")
+	}
+
+	if sort == "" {
+	} else if sort != "newest" && sort != "oldest" {
+		return nil, fmt.Errorf("sort must be 'newest' or 'oldest'")
+	}
+
+	if view == "" {
+	} else if view != "asc" && view != "desc" {
+		return nil, fmt.Errorf("view must be 'asc' or 'desc'")
+	}
+
+	if limit == "" {
+		limit = "10"
+	}
+
+	if page == "" {
+		page = "1"
+	}
+
+	media, err := med.MediaRepo.RetrivesMedia(cateId, sort, view, limit, page)
 	if err != nil {
-		log.Println("error fetching short_video category:", err)
-		return nil, err
+		return nil, fmt.Errorf("cannot fetch media in media service")
 	}
 
-	if category == nil {
-		return nil, fmt.Errorf("category 'short vdo' not found")
-	}
-
-	video, err := med.MediaRepo.GetVideoHome(category.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	categoryIDMap := make(map[string]struct{})
-
-	for _, vdo := range video {
-		if vdo.CategoryID != "" {
-			categoryIDMap[vdo.CategoryID] = struct{}{}
-		}
-	}
-
-	categoryIDs := keysFromMap(categoryIDMap)
-
-	categories, err := med.categoryService.GetByIDs(categoryIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	categoryMap := make(map[string]domain.CategoryResponse)
-	for _, ca := range categories {
-		categoryMap[ca.ID] = *ca
-	}
-
-	var responseVDO []*domain.VideoResponse
-
-	for _, result := range video {
-
-		var categoryResponse domain.CategoryResponse
-		if result.CategoryID != "" {
-			if cat, ok := categoryMap[result.CategoryID]; ok {
-				categoryResponse = cat
-			}
-		}
-
-		resp := &domain.VideoResponse{
-			Title:    result.Title,
-			Content:  result.Content,
-			URL:      result.VideoURL,
-			Category: categoryResponse,
-		}
-
-		responseVDO = append(responseVDO, resp)
-
-	}
-
-	return responseVDO, nil
+	return media, err
 }
 
-func (med *MediaService) GetShortVideoHome() ([]*domain.ShortVideo, error) {
-
-	categories, err := med.categoryRepo.GetByName("Short Video")
-	if err != nil {
-		return nil, fmt.Errorf("error fetching category: %w", err)
-	}
-
-	short, err := med.MediaRepo.GetShortVideoHome(categories.ID)
+func (med *MediaService) GetMedia(id string) (*domain.Media, error) {
+	resp, err := med.MediaRepo.RetriveMedia(id)
 	if err != nil {
 		return nil, err
 	}
 
-	var responseShort []*domain.ShortVideo
-
-	for _, result := range short {
-
-		resp := &domain.ShortVideo{
-			Title: result.Title,
-			URL:   result.VideoURL,
-		}
-
-		responseShort = append(responseShort, resp)
-
-	}
-
-	return responseShort, nil
+	return resp, err
 }
+
+// func (med *MediaService) GetVideoHome() ([]*domain.VideoResponse, error) {
+
+// 	category, err := med.categoryRepo.GetByName("Short Video")
+// 	if err != nil {
+// 		log.Println("error fetching short_video category:", err)
+// 		return nil, err
+// 	}
+
+// 	if category == nil {
+// 		return nil, fmt.Errorf("category 'short vdo' not found")
+// 	}
+
+// 	video, err := med.MediaRepo.GetVideoHome(category.ID)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	categoryIDMap := make(map[string]struct{})
+
+// 	for _, vdo := range video {
+// 		if vdo.CategoryID != "" {
+// 			categoryIDMap[vdo.CategoryID] = struct{}{}
+// 		}
+// 	}
+
+// 	categoryIDs := keysFromMap(categoryIDMap)
+
+// 	categories, err := med.categoryService.GetByIDs(categoryIDs)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	categoryMap := make(map[string]domain.CategoryResponse)
+// 	for _, ca := range categories {
+// 		categoryMap[ca.ID] = *ca
+// 	}
+
+// 	var responseVDO []*domain.VideoResponse
+
+// 	for _, result := range video {
+
+// 		var categoryResponse domain.CategoryResponse
+// 		if result.CategoryID != "" {
+// 			if cat, ok := categoryMap[result.CategoryID]; ok {
+// 				categoryResponse = cat
+// 			}
+// 		}
+
+// 		resp := &domain.VideoResponse{
+// 			Title:    result.Title,
+// 			Content:  result.Content,
+// 			URL:      result.VideoURL,
+// 			Category: categoryResponse,
+// 		}
+
+// 		responseVDO = append(responseVDO, resp)
+
+// 	}
+
+// 	return responseVDO, nil
+// }
+
+// func (med *MediaService) GetShortVideoHome() ([]*domain.ShortVideo, error) {
+
+// 	categories, err := med.categoryRepo.GetByName("Short Video")
+// 	if err != nil {
+// 		return nil, fmt.Errorf("error fetching category: %w", err)
+// 	}
+
+// 	short, err := med.MediaRepo.GetShortVideoHome(categories.ID)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	var responseShort []*domain.ShortVideo
+
+// 	for _, result := range short {
+
+// 		resp := &domain.ShortVideo{
+// 			Title: result.Title,
+// 			URL:   result.VideoURL,
+// 		}
+
+// 		responseShort = append(responseShort, resp)
+
+// 	}
+
+// 	return responseShort, nil
+// }

@@ -102,6 +102,8 @@ func (cat *MongoCategoryRepository) GetByIDs(ids []string) ([]*domain.Category, 
 			ID:           category.ID.Hex(),
 			Name:         category.Name,
 			CategoryType: category.CategoryType,
+			CreatedAt:    category.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:    category.UpdatedAt.Format(time.RFC3339),
 		}
 		responses = append(responses, resp)
 	}

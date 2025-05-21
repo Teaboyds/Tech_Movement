@@ -150,12 +150,9 @@ func (n *NewsServiceImpl) GetNewsByID(id string) (*d.NewsResponse, error) {
 		Tags:        news.Tags,
 		Status:      news.Status,
 		ContentType: news.ContentType,
+		PageView:    news.View,
 		CreatedAt:   news.CreatedAt,
 		UpdatedAt:   news.UpdatedAt,
-	}
-
-	for i, img := range response.ImageIDs {
-		response.ImageIDs[i].Path = utils.AttachBaseURLToImage(img.FileType, img.Path)
 	}
 
 	return response, nil
@@ -204,7 +201,7 @@ func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponseV2, error) {
 		}
 	}
 
-	categoryMap := make(map[string]domain.CategoryResponse)
+	categoryMap := make(map[string]domain.Category)
 	for _, ca := range categories {
 		categoryMap[ca.ID] = *ca
 	}
@@ -213,7 +210,7 @@ func (n *NewsServiceImpl) GetLastNews() ([]*d.NewsResponseV2, error) {
 
 	for _, news := range lastedNews {
 
-		var categoryResponse domain.CategoryResponse
+		var categoryResponse domain.Category
 		if news.CategoryID != "" {
 			if cat, ok := categoryMap[news.CategoryID]; ok {
 				categoryResponse = cat
@@ -289,7 +286,7 @@ func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponseV2, error) {
 		}
 	}
 
-	categoryMap := make(map[string]domain.CategoryResponse)
+	categoryMap := make(map[string]domain.Category)
 	for _, ca := range categories {
 		categoryMap[ca.ID] = *ca
 	}
@@ -298,7 +295,7 @@ func (n *NewsServiceImpl) GetTechnologyNews() ([]*d.NewsResponseV2, error) {
 
 	for _, news := range lastedNews {
 
-		var categoryResponse domain.CategoryResponse
+		var categoryResponse domain.Category
 		if news.CategoryID != "" {
 			if cat, ok := categoryMap[news.CategoryID]; ok {
 				categoryResponse = cat
@@ -341,31 +338,33 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page, status, view, 
 		page = "1"
 	}
 
+	if limit == "" {
+		limit = "10"
+	}
+
+	fmt.Printf("limit: %v\n", limit)
+
 	Sort = strings.ToLower(Sort)
 	view = strings.ToLower(view)
 
 	if Sort == "" {
-
-	} else if Sort != "newest" && Sort != "lowest" {
-		return nil, fmt.Errorf("sort must be 'asc' or 'desc'")
+	} else if Sort != "newest" && Sort != "oldest" {
+		return nil, fmt.Errorf("sort must be 'newest' or 'oldest'")
 	}
 
 	if view == "" {
-
 	} else if view != "asc" && view != "desc" {
 		return nil, fmt.Errorf("sort must be 'asc' or 'desc'")
 	}
 
-	fmt.Printf("page: %v\n", page)
-
 	parseLimit, err := strconv.ParseInt(limit, 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot parse limit :%v", err)
 	}
 
 	parsePage, err := strconv.ParseInt(page, 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot parse page :%v", err)
 	}
 
 	CacheKey := "news_cache:" + catID + "_" + ConType + "_" + page + "_" + limit + "_" + status + "_" + view
@@ -415,7 +414,7 @@ func (n *NewsServiceImpl) Find(catID, ConType, Sort, limit, page, status, view, 
 		}
 	}
 
-	catMap := make(map[string]domain.CategoryResponse)
+	catMap := make(map[string]domain.Category)
 	for _, c := range categories {
 		catMap[c.ID] = *c
 	}
@@ -460,9 +459,13 @@ func (n *NewsServiceImpl) Count(catID, ConType, Status, limit, page string) (*d.
 		return nil, fmt.Errorf("cannot fetch count data:%s", err)
 	}
 
+	if limit == "" {
+		limit = "10"
+	}
+
 	parseLimit, err := strconv.ParseInt(limit, 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot parse limit :%s", err)
 	}
 
 	totalPageSum := int64(math.Ceil(float64(total) / float64(parseLimit)))

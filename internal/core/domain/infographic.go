@@ -1,17 +1,19 @@
 package domain
 
 type Infographic struct {
-	ID        string   `json:"id"`
-	Image     string   `json:"image"`
-	Title     string   `json:"title"`
-	Category  string   `json:"category"`
-	Tags      []string `json:"tags"`
-	Status    bool     `json:"status"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	ID        string
+	Image     string
+	Title     string
+	Category  string
+	Tags      []string
+	Status    string
+	PageView  string
+	CreatedAt string
+	UpdatedAt string
 }
 
-type InfographicRequest struct {
+// DTO //
+type InfographicRequestDTO struct {
 	Image    string   `json:"image"`
 	Title    string   `json:"title"`
 	Category string   `json:"category"`
@@ -20,8 +22,13 @@ type InfographicRequest struct {
 }
 
 type InfographicRespose struct {
-	ID        string             `json:"id"`
-	Title     string             `json:"title"`
-	Image     UploadFileResponse `json:"image"`
-	CreatedAt string             `json:"created_at"`
+	ID        string     `json:"id"`
+	Title     string     `json:"title"`
+	Category  Category   `json:"category"`
+	Image     UploadFile `json:"image"`
+	Tags      []string   `json:"tags"`
+	Status    string     `json:"status"`
+	PageView  string     `json:"page_view"`
+	CreatedAt string     `json:"created_at"`
+	UpdatedAt string     `json:"updated_at"`
 }

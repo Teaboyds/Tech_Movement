@@ -62,19 +62,21 @@ func (cats *CategoryService) GetAll() ([]domain.CategoryResponse, error) {
 	return cateDTO, nil
 }
 
-func (cats *CategoryService) GetByIDs(ids []string) ([]*domain.CategoryResponse, error) {
+func (cats *CategoryService) GetByIDs(ids []string) ([]*domain.Category, error) {
 
 	Cate, err := cats.CatRepo.GetByIDs(ids)
 	if err != nil {
 		return nil, err
 	}
 
-	var responses []*domain.CategoryResponse
+	var responses []*domain.Category
 	for _, category := range Cate {
-		resp := &domain.CategoryResponse{
+		resp := &domain.Category{
 			ID:           category.ID,
 			Name:         category.Name,
 			CategoryType: category.CategoryType,
+			CreatedAt:    category.CreatedAt,
+			UpdatedAt:    category.UpdatedAt,
 		}
 		responses = append(responses, resp)
 	}
